@@ -1,0 +1,126 @@
+//
+// Created by Yuqi on 2023/2/18.
+//
+
+#include "webserver.h"
+
+WebServer::WebServer() {
+
+    // 创建http_conn对象 每个对象以连接的fd作为下标，保存对应信息
+    users = new http_conn[MAX_FD];
+
+}
+
+WebServer::~WebServer() {
+    close(m_epollfd);
+    close(m_listenfd);
+
+    delete [] users;
+    delete m_pool;
+}
+
+void WebServer::init(int port, int thread_num, int trigmode, int actor_model) {
+    m_port = port;
+    m_thread_num = thread_num;
+    m_trigmode = trigmode;
+    trig_mode();
+    m_actormodel = actor_model;
+}
+
+void WebServer::trig_mode() {
+    switch (m_trigmode) {
+        case 0:{            // LT + LT
+            m_LISTENTrigmode = 0;
+            m_CONNTrigmode = 0;
+            break;
+        }
+        case 1:{            // LT + ET
+            m_LISTENTrigmode = 0;
+            m_CONNTrigmode = 1;
+            break;
+        }
+        case 2:{            // ET + LT
+            m_LISTENTrigmode = 1;
+            m_CONNTrigmode = 0;
+            break;
+        }
+        case 3:{            // ET + ET
+            m_LISTENTrigmode = 1;
+            m_CONNTrigmode = 1;
+            break;
+        }
+        default:{           // 默认是 LT + LT
+            m_LISTENTrigmode = 0;
+            m_CONNTrigmode = 0;
+        }
+    }
+}
+
+void WebServer::thread_pool() {
+    m_pool = new threadpool<http_conn>(m_actormodel, m_connPool, m_thread_num);
+}
+
+void WebServer::eventListen() {    // 创建监听socket并监听  和创建epoll，
+
+    // 创建监听socket
+    m_listenfd = socket(PF_INET, SOCK_STREAM, 0);
+    assert(m_listenfd >= 0);
+
+    // 设置server地址
+    struct sockaddr_in address;
+    bzero(&address, sizeof(address));
+    address.sin_family = AF_INET;
+    address.sin_port = htons(m_port);
+    address.sin_addr.s_addr = htonl(INADDR_ANY);
+    // 设置端口复用
+    int flag=1;
+    setsockopt(m_listenfd, SOL_SOCKET, SO_REUSEADDR, &flag, sizeof(flag));
+    // 绑定
+    int ret = bind(m_listenfd, (struct sockaddr*)&address, sizeof(address) );
+    assert(ret >= 0);
+
+    // 监听
+    ret = listen(m_listenfd, 5);
+    assert(ret >= 0);
+
+    // 创建epoll
+    m_epollfd = epoll_create(5);   //参数没有意义
+    assert(m_epollfd != -1);
+
+    utils.init();
+    // 向epoll注册监听socket fd 文件描述符， 注意不能设置成oneshot
+    //对于监听的sockfd，最好使用水平触发模式，边缘触发模式会导致高并发情况下，有的客户端会连接不上。如果非要使用边缘触发，网上有的方案是用while来循环accept()。
+    utils.addfd(m_epollfd, m_listenfd, false, m_LISTENTrigmode);
+
+    http_conn::m_epollfd = m_epollfd;
+}
+
+void WebServer::eventLoop() {
+
+    bool stop_server = false;
+
+    while(!stop_server) {
+
+        int number = epoll_wait(m_epollfd, events, MAX_EVENT_NUMBER, -1);
+
+        for(int i=0; i<number; i++) {
+
+            int sockfd = events[i].data.fd;
+
+            if(sockfd == m_listenfd){    // 有新的连接进来了
+                dealclientdata();
+            }
+        }
+
+    }
+
+
+}
+
+// 处理新进来的客户端连接
+bool WebServer::dealclientdata() {
+
+    struct sockaddr_in client_address;
+
+    m_pool->append()
+}
