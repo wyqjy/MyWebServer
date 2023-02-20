@@ -93,6 +93,10 @@ void WebServer::eventListen() {    // 创建监听socket并监听  和创建epol
     utils.addfd(m_epollfd, m_listenfd, false, m_LISTENTrigmode);
 
     http_conn::m_epollfd = m_epollfd;
+
+    http_conn::utils = utils;
+
+    std::cout<<"监听socket和epoll创建完成"<<std::endl;
 }
 
 void WebServer::eventLoop() {
@@ -107,9 +111,24 @@ void WebServer::eventLoop() {
 
             int sockfd = events[i].data.fd;
 
-            if(sockfd == m_listenfd){    // 有新的连接进来了
-                dealclientdata();
+            if(sockfd == m_listenfd){    // 监听fd有反应   有新的连接进来了
+                bool flag = dealclientdata();
+                if(!flag)    // 新的客户端连接加入失败， 可能是连接队列users满了
+                    continue;
             }
+            else if ( events[i].events & (EPOLLRDHUP | EPOLLHUP | EPOLLERR) ) {
+                // 客户端连接关闭
+                std::cout<<" 客户端关闭连接 "<<std::endl;
+            }
+            else if( events[i].events & EPOLLIN) {
+                // 处理来自客户端的数据，还没读呢
+                m_pool->append(&users[sockfd]);
+            }
+            else if( events[i].events & EPOLLOUT) {
+                // 要向客户端发送数据，也还没写呢
+
+            }
+
         }
 
     }
@@ -117,10 +136,29 @@ void WebServer::eventLoop() {
 
 }
 
-// 处理新进来的客户端连接
+// 处理新进来的客户端连接   处理监听连接
 bool WebServer::dealclientdata() {
 
     struct sockaddr_in client_address;
+    socklen_t client_addrlength = sizeof(client_address);
+    if (m_LISTENTrigmode == 0 ) {  // 水平触发
+        int connfd = accept(m_listenfd, (struct sockaddr *)&client_address, &client_addrlength);
+        if(connfd < 0) {
+            return false;
+        }
+        if(http_conn::m_user_count >= MAX_FD) {   // 连接数量已满
+            return false;
+        }
+        users[connfd].init(connfd, client_address, m_CONNTrigmode);
 
-    m_pool->append()
+        // 提示输出有一个客户端连接加入了进来
+        std::cout<<"有一个客户端连接加入了进来， 通信socketfd: "<<connfd<<std::endl;
+
+    }
+    else{   // 监听的边缘触发，暂时不管
+        std::cout<<"Warning: 监听的边缘触发暂未实现"<<std::endl;
+        exit(-1);
+
+    }
+    return true;
 }

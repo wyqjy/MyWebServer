@@ -4,6 +4,8 @@
 
 #include "lst_timer.h"
 
+void Utils::init() {}
+
 // 将文件描述符设置为非阻塞，返回原先的文件描述符的属性
 int Utils::setnonblocking(int fd) {
     int old_option = fcntl(fd, F_GETFL);

@@ -8,6 +8,7 @@
 #include <pthread.h>
 #include <list>
 #include <cstdio>
+
 #include <exception>
 #include "../lock/locker.h"
 #include "../CGImysql/sql_connection_pool.h"
@@ -107,11 +108,15 @@ void threadpool<T>::run() {
         m_workqueue.pop_front();
         m_queuelocker.unlock();
 
-        if( m_actor_model == 1){
+        if( m_actor_model == 1){     // Reactor
+
+            printf("Reactor模式，暂时没有实现\n");
+            return ;
+
             request->process();   // 未完
         }
-        else {
-
+        else {                       // Proactor  主线程来处理读写  以同步的方式模拟异步
+            request->process();
         }
 
 
