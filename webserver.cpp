@@ -131,6 +131,8 @@ void WebServer::eventLoop() {
 
         }
 
+        std::cout<<"处理了"<<number<<"个事件"<<std::endl;
+
     }
 
 

@@ -17,6 +17,9 @@ void http_conn::init(int sockfd, const sockaddr_in &addr, int TRIGMode) {
 }
 
 void http_conn::process() {
-    printf("线程池中的线程正在处理数据：该线程号是 %ld\n", pthread_self());
-    sleep(1);
+
+    while(1){
+        printf("线程池中的线程正在处理数据：该线程号是 %ld\n", pthread_self());
+        sleep(1);
+    }
 }

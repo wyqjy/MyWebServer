@@ -53,10 +53,12 @@ threadpool<T>::threadpool(int actor_model, connection_pool *connPool, int thread
         throw std::exception();
     }
     for(int i=0; i<m_thread_number; i++) {
-        if(pthread_create(m_pthread+i, NULL, work, this) != 0) {
+        int  flag = pthread_create(m_pthread+i, NULL, work, this);
+        if( flag != 0) {
             delete [] m_pthread;
             throw std::exception();
         }
+        printf("创建了第%d个子线程： %ld\n", i+1, m_pthread[i]);
 
         if(pthread_detach(m_pthread[i]) != 0){
             delete [] m_pthread;

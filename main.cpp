@@ -13,6 +13,8 @@ int main() {
 
     server.init(port, thread_num, trigmode, actor_model);
 
+    server.thread_pool();
+
     server.eventListen();
 
     server.eventLoop();
