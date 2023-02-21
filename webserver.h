@@ -43,6 +43,9 @@ public:
 
     bool dealclientdata();   // 处理新进来的客户端连接
 
+    void dealwithread(int sockfd);   // 处理读数据， 接受请求
+    void dealwithwrite(int sockfd);  // 处理写数据， 发送
+
 
 private:
     int m_listenfd;     // 监听的文件描述符

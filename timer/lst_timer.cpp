@@ -34,3 +34,8 @@ void Utils::addfd(int epollfd, int fd, bool one_shot, int TRIGMode) {
     // 将socket文件描述符设置为非阻塞
     setnonblocking(fd);
 }
+
+void Utils::removefd(int epollfd, int fd) {
+    epoll_ctl(epollfd, EPOLL_CTL_DEL, fd, 0);
+    close(fd);
+}

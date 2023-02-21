@@ -121,12 +121,12 @@ void WebServer::eventLoop() {
                 std::cout<<" 客户端关闭连接 "<<std::endl;
             }
             else if( events[i].events & EPOLLIN) {
-                // 处理来自客户端的数据，还没读呢
-                m_pool->append(&users[sockfd]);
+                // 处理来自客户端的数据
+                dealwithread(sockfd);
             }
             else if( events[i].events & EPOLLOUT) {
-                // 要向客户端发送数据，也还没写呢
-
+                // 要向客户端发送数据
+                dealwithwrite(sockfd);
             }
 
         }
@@ -163,4 +163,24 @@ bool WebServer::dealclientdata() {
 
     }
     return true;
+}
+
+void WebServer::dealwithread(int sockfd) {
+
+    if ( m_actormodel == 0) {      // Proactor   在主线程中读取数据
+        if( users[sockfd].read_once() ) {
+            // 检测到了读事件，并读取了数据
+            m_pool->append(&users[sockfd]);
+        }
+        else {   // 对方断开连接或者出错，要把user中对应的对象销毁
+            users->close_conn(true);  // 关闭连接， 如果有定时器的话，应该也可以不管，到时间也会清除，看他的项目里在这就没有，只是清除了定时器
+        }
+
+
+    }
+    else {                      // Reactor 让子进程读写数据，在线程池的工作函数中需要加以判断
+
+    }
+
+
 }

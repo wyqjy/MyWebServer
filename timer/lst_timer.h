@@ -12,6 +12,7 @@
 #include <cstdlib>
 #include <errno.h>
 #include <fcntl.h>
+#include <unistd.h>
 
 
 class Utils {
@@ -26,6 +27,9 @@ public:
 
     // 向epoll中注册事件
     void addfd(int epollfd, int fd, bool one_shot, int TRIGMode);
+
+    // 从epoll中移除fd
+    void removefd(int epollfd, int fd);
 
 };
 
