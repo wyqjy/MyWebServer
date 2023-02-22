@@ -173,7 +173,7 @@ void WebServer::dealwithread(int sockfd) {
             m_pool->append(&users[sockfd]);
         }
         else {   // 对方断开连接或者出错，要把user中对应的对象销毁
-            users->close_conn(true);  // 关闭连接， 如果有定时器的话，应该也可以不管，到时间也会清除，看他的项目里在这就没有，只是清除了定时器
+            users->close_conn(true);  // 关闭连接， 如果有定时器的话，应该也可以不管，到时间也会清除，看他的项目里在这就没有，只是清除了定时器，好像不行啊
         }
 
 
@@ -182,5 +182,7 @@ void WebServer::dealwithread(int sockfd) {
 
     }
 
+}
+void WebServer::dealwithwrite(int sockfd) {
 
 }

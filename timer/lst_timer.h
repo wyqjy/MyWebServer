@@ -31,6 +31,8 @@ public:
     // 从epoll中移除fd
     void removefd(int epollfd, int fd);
 
+    void modfd(int epollfd, int fd, int ev, int TRIGMode);
+
 };
 
 

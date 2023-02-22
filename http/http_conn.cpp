@@ -74,7 +74,59 @@ bool http_conn::read_once() {
 
 void http_conn::process() {
 
-    printf("线程池中的线程正在处理数据：该线程号是 %ld\n", pthread_self());
-    sleep(1);
+    HTTP_CODE read_ret = process_read();  // 解析读进来的请求
+    if(read_ret == NO_REQUEST){    // 请求不完整，需要继续读取客户数据
+        utils.modfd(m_epollfd, m_sockfd, EPOLLIN, m_TRIGMode);   // oneshot  重新添加
+        return ;
+    }
 
+//    printf("线程池中的线程正在处理数据：该线程号是 %ld\n", pthread_self());
+
+
+}
+
+
+// =================================   对读进来  请求的解析
+http_conn::HTTP_CODE http_conn::process_read() {
+    LINE_STATUS line_status = LINE_OK;   // 读取的一行的状态
+    HTTP_CODE ret = NO_REQUEST;
+    char *text = 0;
+
+    while ((m_check_state == CHECK_STATE_CONTENT && line_status == LINE_OK) || (line_status = parse_line()) == LINE_OK) {
+
+    }
+
+
+
+
+}
+
+
+//从状态机，用于分析出一行内容
+//返回值为行的读取状态，有LINE_OK,LINE_BAD,LINE_OPEN
+//    在从状态机中，每一行的数据都是以\r\n作为结束字符，空行则仅仅是\r\n。因此，通过查找\r\n将报文拆解成单独的行进行解析。
+http_conn::LINE_STATUS http_conn::parse_line() {
+    char temp;
+    for ( ; m_checked_idx < m_read_idx; ++m_checked_idx) {
+        temp = m_read_buf[m_checked_idx];
+        if(temp == '\r') {
+            if( (m_checked_idx + 1) == m_read_idx)
+                return LINE_OPEN;
+            else if (m_read_buf[m_checked_idx+1] == '\n' ) {
+                m_read_buf[m_checked_idx++] = '\0';
+                m_read_buf[m_checked_idx++] = '\0';
+                return LINE_OK;
+            }
+            return LINE_BAD;
+        }
+        else if(temp == '\n'){
+            if(m_checked_idx > 1 && m_read_buf[m_checked_idx-1]== '\r'){    // 受到传输过来的报文大小和 本地m_read_buf的最大大小限制， 一条数据可能被分成多个报文，尤其是在请求体中
+                m_read_buf[m_checked_idx-1] = '\0';
+                m_read_buf[m_checked_idx++] = '\0';
+                return LINE_OK;
+            }
+            return LINE_BAD;
+        }
+    }
+    return LINE_OPEN;
 }

@@ -39,3 +39,16 @@ void Utils::removefd(int epollfd, int fd) {
     epoll_ctl(epollfd, EPOLL_CTL_DEL, fd, 0);
     close(fd);
 }
+
+// 将事件重置为EPOLLONESHOT
+void Utils::modfd(int epollfd, int fd, int ev, int TRIGMode) {
+    epoll_event event;
+    event.data.fd = fd;
+
+    if(TRIGMode == 1)
+        event.events = ev | EPOLLET | EPOLLONESHOT | EPOLLRDHUP;
+    else
+        event.events = ev | EPOLLONESHOT | EPOLLRDHUP;
+
+    epoll_ctl(epollfd, EPOLL_CTL_MOD, fd, &event);
+}
