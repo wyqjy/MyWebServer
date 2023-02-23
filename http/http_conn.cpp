@@ -13,6 +13,13 @@ void http_conn::init(int sockfd, const sockaddr_in &addr, int TRIGMode) {
     m_address = addr;
     m_TRIGMode = TRIGMode;
 
+
+    m_read_idx = 0;
+    m_check_state = CHECK_STATE_REQUESTLINE;
+    m_checked_idx = 0;
+    m_start_line = 0;
+
+
     utils.addfd(m_epollfd, m_sockfd, true, m_TRIGMode);
 }
 
@@ -30,7 +37,7 @@ void http_conn::close_conn(bool real_close) {
 
 //循环读取客户数据，直到无数据可读或对方关闭连接
 /*
- * m_read_idx 是什么时候重置的呢？？？？？？？？
+ * m_read_idx 是什么时候重置的呢？  在init中， 这也是为什么init里的内容不能一起放到构造函数里的原因， 处理完一个请求后，需要重置这些读数据和解析的变量
  * */
 bool http_conn::read_once() {
     if(m_read_idx >= READ_BUFFER_SIZE) {
@@ -74,13 +81,13 @@ bool http_conn::read_once() {
 
 void http_conn::process() {
 
-    HTTP_CODE read_ret = process_read();  // 解析读进来的请求
-    if(read_ret == NO_REQUEST){    // 请求不完整，需要继续读取客户数据
-        utils.modfd(m_epollfd, m_sockfd, EPOLLIN, m_TRIGMode);   // oneshot  重新添加
-        return ;
-    }
+//    HTTP_CODE read_ret = process_read();  // 解析读进来的请求
+//    if(read_ret == NO_REQUEST){    // 请求不完整，需要继续读取客户数据
+//        utils.modfd(m_epollfd, m_sockfd, EPOLLIN, m_TRIGMode);   // oneshot  重新添加
+//        return ;
+//    }
 
-//    printf("线程池中的线程正在处理数据：该线程号是 %ld\n", pthread_self());
+    printf("线程池中的线程正在处理数据：该线程号是 %ld\n", pthread_self());
 
 
 }
@@ -94,10 +101,26 @@ http_conn::HTTP_CODE http_conn::process_read() {
 
     while ((m_check_state == CHECK_STATE_CONTENT && line_status == LINE_OK) || (line_status = parse_line()) == LINE_OK) {
 
+        text = get_line();              // 获取一行的数据
+        m_start_line = m_checked_idx;   // 新的下一行的起始位置
+
+        switch(m_check_state) {
+            case CHECK_STATE_REQUESTLINE: {
+                ret = parse_request_line(text);
+                break;
+            }
+            case CHECK_STATE_HEADER: {
+                break;
+            }
+            case CHECK_STATE_CONTENT: {
+                break;
+            }
+            default:
+                return INTERNAL_ERROR;    // 服务器内部错误，一般不会触发
+        }
+
     }
-
-
-
+    return NO_REQUEST;    // 请求不完整，需要继续读取请求报文数据
 
 }
 
@@ -129,4 +152,57 @@ http_conn::LINE_STATUS http_conn::parse_line() {
         }
     }
     return LINE_OPEN;
+}
+
+
+
+//解析请求头          GET /test.html HTTP/1.1
+http_conn::HTTP_CODE http_conn::parse_request_line(char *text) {
+    m_url = strpbrk(text, "\t");   // 在第一个字符串里找到第一个匹配第二个字符串的字符
+    if(!m_url) {
+        return BAD_REQUEST;  // 客户端请求语法错误
+    }
+
+    *m_url++ = '\0';
+    char *method = text;
+    if (strcasecmp(method, "GET") == 0)     // strcasecmp 忽略大小写比较字符串是否相等
+        m_method = GET;
+    else if (strcasecmp(method, "POST") == 0)
+    {
+        m_method = POST;
+        cgi = 1;
+    }
+    else
+        return BAD_REQUEST;
+
+    m_url += strspn(m_url, " \t");     // 检索字符串 str1 中第一个不在字符串 str2 中出现的字符下标。  这个有必要吗？上面不是已经把\t换成\0， 难道有两个连续的 \t
+    m_version = strpbrk(m_url, " \t");
+    if (!m_version)
+        return BAD_REQUEST;
+    *m_version++ = '\0';
+
+    m_version += strspn(m_version, " \t");
+    if (strcasecmp(m_version, "HTTP/1.1") != 0)
+        return BAD_REQUEST;
+    if (strncasecmp(m_url, "http://", 7) == 0)      // 只比较前7个字符     我看读进来的报文直接就是/test.html，前面没有http啥的啊， 需要这样吗
+    {
+        m_url += 7;
+        m_url = strchr(m_url, '/');                     // 在参数 str 所指向的字符串中搜索第一次出现字符 c（一个无符号字符）的位置
+    }
+
+    if (strncasecmp(m_url, "https://", 8) == 0)
+    {
+        m_url += 8;
+        m_url = strchr(m_url, '/');
+    }
+
+    if (!m_url || m_url[0] != '/')
+        return BAD_REQUEST;
+    //当url为/时，显示判断界面
+    if (strlen(m_url) == 1)
+        strcat(m_url, "judge.html");
+    m_check_state = CHECK_STATE_HEADER;
+    return NO_REQUEST;
+
+
 }

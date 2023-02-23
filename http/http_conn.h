@@ -71,13 +71,27 @@ public:
 
     void process();
 
-    // 解析数据相关
-    HTTP_CODE process_read();     // 对读入的数据进行解析   主状态机
 
-    LINE_STATUS parse_line();     // 解析一行数据   从状态机
 private:
     CHECK_STATE m_check_state;   // 主状态机当前的所处状态
-    int m_checked_idx;
+    int m_checked_idx;           // 当前正在分析的字符在读缓冲区的位置
+    int m_start_line;
+    char *get_line() {return m_read_buf + m_start_line; };  // 通过parse_line函数就将一段拆成了一行了，将原来的\r\n变成\0\0, 所以从这开始的就是一行的数据，到\0结束了
+
+    // 解析数据相关
+    HTTP_CODE process_read();     // 对读入的数据进行解析   主状态机
+    HTTP_CODE parse_request_line(char *text);
+
+    LINE_STATUS parse_line();     // 解析一行数据   从状态机
+
+    // 解析出来的相关属性
+    char *m_url;                // 要找的本地资源的路径，一定以 / 开头
+    char *m_version;
+    METHOD m_method;
+
+    int cgi;        //是否启用的POST
+
+
 
 
 public:   // 读写数据相关
