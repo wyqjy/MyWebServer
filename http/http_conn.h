@@ -90,20 +90,21 @@ private:
 
     HTTP_CODE process_read();     // 对读入的数据进行解析   主状态机
     LINE_STATUS parse_line();     // 获取一行数据   从状态机
-    HTTP_CODE parse_request_line(char *text);   // 解析请求行
+    HTTP_CODE parse_request_line(char *text);    // 解析请求行
     HTTP_CODE parse_headers(char *text);         // 解析请求头
-    HTTP_CODE parse_content(char *text);        // 解析请求体
-    HTTP_CODE do_request();                     // 报文解析完后，对请求处理，看看请求的东西在不在之类的。
+    HTTP_CODE parse_content(char *text);         // 解析请求体
+    HTTP_CODE do_request();                      // 报文解析完后，对请求处理，看看请求的东西在不在之类的。
 
     // 解析出来的相关属性
     char m_real_file[FILENAME_LEN];  // 客户请求的目标文件的完整路径，其内容等于 doc_root + m_url, doc_root是网站根目录
-    char *m_url;                // 要找的本地资源的路径，一定以 / 开头
+    char *m_url;                     // 要找的本地资源的路径，一定以 / 开头
     char *m_version;
     METHOD m_method;
     char *m_host;
-    int cgi;        //是否启用的POST
+    int cgi;                // 是否启用的POST
     int m_content_length;   // http请求消息的总长度
     bool m_linger;          // http请求是否保持连接
+    char *m_string;         // 存储请求头的数据
 
 
 

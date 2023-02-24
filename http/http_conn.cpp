@@ -40,6 +40,7 @@ void http_conn::init() {
     m_host = 0;
     m_content_length = 0;
     m_linger = false;
+    m_string = 0;    // 保存请求体数据的，在项目里没有，我自己加的这句
 
     memset(m_read_buf, '\0', READ_BUFFER_SIZE);
     memset(m_real_file, '\0', FILENAME_LEN);
@@ -137,13 +138,17 @@ http_conn::HTTP_CODE http_conn::process_read() {
             case CHECK_STATE_HEADER: {
                 ret = parse_headers(text);
                 if(ret == BAD_REQUEST)
-                        return BAD_REQUEST;
+                    return BAD_REQUEST;
                 else if(ret == GET_REQUEST) {
                     return do_request();
                 }
                 break;
             }
             case CHECK_STATE_CONTENT: {
+                ret = parse_content(text);
+                if(ret == GET_REQUEST)
+                    return do_request();
+                line_status = LINE_OPEN;
                 break;
             }
             default:
@@ -250,16 +255,17 @@ http_conn::HTTP_CODE http_conn::parse_request_line(char *text) {
 
 
 //解析http请求头
-//Host: 43.143.195.140:9999
-//Connection: keep-alive
-//Upgrade-Insecure-Requests: 1
-//User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36 Edg/110.0.1587.50
-//Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
-//Accept-Encoding: gzip, deflate
-//Accept-Language: zh-CN,zh;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6
 http_conn::HTTP_CODE http_conn::parse_headers(char *text) {
+//  Host: 43.143.195.140:9999
+//  Connection: keep-alive
+//  Upgrade-Insecure-Requests: 1
+//  User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36 Edg/110.0.1587.50
+//  Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
+//  Accept-Encoding: gzip, deflate
+//  Accept-Language: zh-CN,zh;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6
+//  \r\n
 
-    if(text[0] == '\0') {
+    if(text[0] == '\0') {   // 请求头之后有一个空行，判断是不是空行
         if(m_content_length != 0 ){    // 存在请求体，一般post会有请求体
             m_check_state = CHECK_STATE_CONTENT;   // 修改状态，变为解析请求体
             return NO_REQUEST;    // 还需要继续解析
@@ -285,6 +291,18 @@ http_conn::HTTP_CODE http_conn::parse_headers(char *text) {
     }
     else{       // 对于其他信息，不加以解析
         printf("oop! unknow header: %s\n", text);
+    }
+    return NO_REQUEST;
+}
+
+
+//解析请求体
+http_conn::HTTP_CODE http_conn::parse_content(char *text) {
+    if( m_read_idx >= (m_content_length + m_checked_idx) ) {
+        text[m_content_length] = '\0';
+        // POST请求中最后为输入的用户名和密码
+        m_string = text;
+        return GET_REQUEST;
     }
     return NO_REQUEST;
 }
