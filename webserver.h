@@ -55,6 +55,8 @@ private:
 
     http_conn *users;   // 建立连接的客户端，用connfd作为下标可以找到对应的连接信息
 
+    char *m_root;    // 资源路径
+
     // 触发模式相关
     int m_trigmode;    // 触发组合模式(0-3表示监听和连接fd的四种触发组合) 根据0-3这4个数对下面监听fd和连接fd的水平和边缘触发进行组合
     int m_LISTENTrigmode;   //监听fd的触发模式

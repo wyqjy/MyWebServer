@@ -13,10 +13,12 @@
 #include <arpa/inet.h>
 #include <cstring>
 #include <sys/socket.h>
+#include <sys/stat.h>
 #include <errno.h>
 
 #include <pthread.h>
 #include <unistd.h>
+#include <sys/mman.h>
 
 #include "../timer/lst_timer.h"
 
@@ -73,7 +75,7 @@ public:
     http_conn() {}
     ~http_conn() {}
 
-    void init(int sockfd, const sockaddr_in &addr, int TRIGMode);
+    void init(int sockfd, const sockaddr_in &addr, char *root, int TRIGMode);
     void close_conn(bool real_close);
 
     void process();
@@ -82,7 +84,7 @@ public:
 private:
     void init();
 
-    // 解析数据相关
+    // ---------------------- 解析数据相关
     CHECK_STATE m_check_state;   // 主状态机当前的所处状态
     int m_checked_idx;           // 当前正在分析的字符在读缓冲区的位置
     int m_start_line;
@@ -93,7 +95,6 @@ private:
     HTTP_CODE parse_request_line(char *text);    // 解析请求行
     HTTP_CODE parse_headers(char *text);         // 解析请求头
     HTTP_CODE parse_content(char *text);         // 解析请求体
-    HTTP_CODE do_request();                      // 报文解析完后，对请求处理，看看请求的东西在不在之类的。
 
     // 解析出来的相关属性
     char m_real_file[FILENAME_LEN];  // 客户请求的目标文件的完整路径，其内容等于 doc_root + m_url, doc_root是网站根目录
@@ -105,6 +106,12 @@ private:
     int m_content_length;   // http请求消息的总长度
     bool m_linger;          // http请求是否保持连接
     char *m_string;         // 存储请求头的数据
+
+    // ---------------------- 对解析后的数据做逻辑处理
+    HTTP_CODE do_request();                // 报文解析完后，对请求处理，看看请求的东西在不在之类的。
+    struct stat m_file_stat;               // 客户端请求资源的属性
+
+    char *m_file_address;
 
 
 
@@ -120,13 +127,15 @@ private:   // 读写数据相关
     int m_read_idx;                      // 已经读入了多少数据
 
 
-public:
+public:    // 基本信息
     static int m_epollfd;     // epollfd
     static int m_user_count;  // 当前已经建立连接的客户端数量
 
     int m_sockfd;             // 和这个客户端连接的fd
     sockaddr_in m_address;    // 客户端的地址
     int m_TRIGMode;           // 这个连接的触发模式
+
+    char *doc_root;
 
     static Utils utils;              // 包含定时器和 把socketfd加入到epoll中  这里主要用到在客户端连接进来的时候，要将connfd注册到epoll中
 

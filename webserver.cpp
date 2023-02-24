@@ -9,6 +9,14 @@ WebServer::WebServer() {
     // 创建http_conn对象 每个对象以连接的fd作为下标，保存对应信息
     users = new http_conn[MAX_FD];
 
+    //root文件夹路径
+    char server_path[200];
+    getcwd(server_path, 200);
+    char root[6] = "/root";
+    m_root = (char *)malloc(strlen(server_path) + strlen(root) + 1);
+    strcpy(m_root, server_path);
+    strcat(m_root, root);
+
 }
 
 WebServer::~WebServer() {
@@ -111,7 +119,7 @@ void WebServer::eventLoop() {
 
             int sockfd = events[i].data.fd;
 
-            if(sockfd == m_listenfd){    // 监听fd有反应   有新的连接进来了
+            if(sockfd == m_listenfd){    // 监听fd有反应   有新地连接进来了
                 bool flag = dealclientdata();
                 if(!flag)    // 新的客户端连接加入失败， 可能是连接队列users满了
                     continue;
@@ -151,7 +159,7 @@ bool WebServer::dealclientdata() {
         if(http_conn::m_user_count >= MAX_FD) {   // 连接数量已满
             return false;
         }
-        users[connfd].init(connfd, client_address, m_CONNTrigmode);
+        users[connfd].init(connfd, client_address, m_root, m_CONNTrigmode);
 
         // 提示输出有一个客户端连接加入了进来
         std::cout<<"有一个客户端连接加入了进来， 通信socketfd: "<<connfd<<std::endl;
