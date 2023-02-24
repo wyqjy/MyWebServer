@@ -312,7 +312,7 @@ http_conn::HTTP_CODE http_conn::do_request() {
     strcpy(m_real_file, doc_root);
     int len = strlen(doc_root);
 
-    printf("do m_url: %s\n", m_url);
+//    printf("do m_url: %s\n", m_url);
     const char *p = strchr(m_url, '/');   // 找到m_url中 / 的位置
 
     // 处理cgi=1（POST） 这里就是登录和注册
@@ -365,7 +365,6 @@ http_conn::HTTP_CODE http_conn::do_request() {
         strncpy(m_real_file + len, m_url, FILENAME_LEN - len - 1);
     }
 
-    printf("Real file: %s\n", m_real_file);  // ---------- ------------
 
     //通过stat获取请求资源文件信息，成功则将信息更新到m_file_stat结构体, 失败返回-1
     //失败返回NO_RESOURCE状态，表示资源不存在
@@ -381,8 +380,6 @@ http_conn::HTTP_CODE http_conn::do_request() {
     //以只读方式获取文件描述符，通过mmap将该文件映射到内存中
     int fd=open(m_real_file,O_RDONLY);
     m_file_address=(char*)mmap(0, m_file_stat.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
-
-
 
     //避免文件描述符的浪费和占用
     close(fd);

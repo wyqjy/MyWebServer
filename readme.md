@@ -119,6 +119,8 @@ A： 这会不会是和浏览器有关，有的浏览器发送的请求报文就
 
 5. Q：保存请求体的m_string 字符指针没有初始化 在init()中， 其他的字符指针=0，就是初始化为null吗？  
    A： 指针赋0，就是不指向任何对象，相当于NULL
+    
+    有些字符指针不初始化会异常中断
 
 6. Q: 请求体的解析，直接到本次消息的m_read_idx(现在读入的数据)就结束，返回GET_REQUEST了， 若一个请求体过长，分成了多个报文传输过来，后面的数据不就没有合到一起吗？  
          这也是因为请求体没有格式，不知道到哪里结束  
@@ -132,4 +134,7 @@ A： 这会不会是和浏览器有关，有的浏览器发送的请求报文就
     ```
     Real file: /home/ubuntu/MyWebServer/cmake-build-debug-mywebserver/root/picture.html
     ```
-   
+   解决办法：  
+        a. 使用相对路径  (路径初始化在WebServer的构造函数里，改这里)
+        b. 在用getpwd()获取绝对根路径时，对最后一个/cmake-build-debug-mywebserver去掉
+        c. 在Clion中修改工作路径应该也可以，没试过
