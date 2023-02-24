@@ -19,6 +19,7 @@
 #include <pthread.h>
 #include <unistd.h>
 #include <sys/mman.h>
+#include <cstdarg>
 
 #include "../timer/lst_timer.h"
 
@@ -76,7 +77,7 @@ public:
     ~http_conn() {}
 
     void init(int sockfd, const sockaddr_in &addr, char *root, int TRIGMode);
-    void close_conn(bool real_close);
+    void close_conn(bool real_close = true);
 
     void process();
 
@@ -111,8 +112,27 @@ private:
     HTTP_CODE do_request();                // 报文解析完后，对请求处理，看看请求的东西在不在之类的。
     struct stat m_file_stat;               // 客户端请求资源的属性
 
-    char *m_file_address;
+    char *m_file_address;                  // 客户端请求的文件被mmap到内存中的起始位置
 
+    // ---------------------- 对结果生成响应报文
+    bool process_write(HTTP_CODE ret);    // 生成响应报文
+    // 下面这些函数将会被process_write()调用 填充HTTP应答
+    void unmap();
+    bool add_response(const char *format, ...);
+    bool add_content(const char *content);
+    bool add_status_line(int status, const char *title);
+    bool add_headers(int content_length);
+    bool add_content_type();
+    bool add_content_length(int content_length);
+    bool add_linger();
+    bool add_blank_line();
+
+    int m_write_idx;                      // 写缓冲区中待发送的字节数, 就是已经放到缓冲区的数据
+    struct iovec m_iv[2];                 // 采用writev来执行写操作，所以定义下面两个成员，其中m_iv_count表示被写内存块的数量。
+    int m_iv_count;                       // 因为有两个部分，0是 m_write_buf 是状态行和响应头部， 1是 m_file_address是响应体，就是要返回的html的内容
+
+    int bytes_to_send;
+    int bytes_have_send;
 
 
 public:   // 读写数据相关
@@ -125,6 +145,10 @@ public:   // 读写数据相关
 private:   // 读写数据相关
     char m_read_buf[READ_BUFFER_SIZE];   // 保存读入的数据
     int m_read_idx;                      // 已经读入了多少数据
+
+    char m_write_buf[WRITE_BUFFER_SIZE];   // 写缓冲区
+
+
 
 
 public:    // 基本信息

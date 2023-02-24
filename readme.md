@@ -104,7 +104,7 @@ A： 这会不会是和浏览器有关，有的浏览器发送的请求报文就
     ```
 
 3. Q： m_linger在哪里用到的 保持连接，就是不会close_conn吗？
-
+    A: 在write()函数中
 
 4.  Q: 请求头的解析中循环条件为什么这样写？
     ```C++
@@ -136,5 +136,8 @@ A： 这会不会是和浏览器有关，有的浏览器发送的请求报文就
     ```
    解决办法：  
         a. 使用相对路径  (路径初始化在WebServer的构造函数里，改这里)
-        b. 在用getpwd()获取绝对根路径时，对最后一个/cmake-build-debug-mywebserver去掉
+        b. 在用getpwd()获取绝对根路径时，对最后一个/cmake-build-debug-mywebserver去掉, 但若有人不用clion，就又不行了, 可以加特判
         c. 在Clion中修改工作路径应该也可以，没试过
+
+9. 可变参数列表 va_list 
+    iovec 

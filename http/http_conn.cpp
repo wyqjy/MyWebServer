@@ -4,6 +4,17 @@
 
 #include "http_conn.h"
 
+//定义http响应的一些状态信息
+const char *ok_200_title = "OK";
+const char *error_400_title = "Bad Request";
+const char *error_400_form = "Your request has bad syntax or is inherently impossible to staisfy.\n";
+const char *error_403_title = "Forbidden";
+const char *error_403_form = "You do not have permission to get file form this server.\n";
+const char *error_404_title = "Not Found";
+const char *error_404_form = "The requested file was not found on this server.\n";
+const char *error_500_title = "Internal Error";
+const char *error_500_form = "There was an unusual problem serving the request file.\n";
+
 int http_conn::m_epollfd = -1;
 int http_conn::m_user_count = 0;
 Utils http_conn::utils = Utils();
@@ -14,8 +25,6 @@ void http_conn::init(int sockfd, const sockaddr_in &addr, char *root, int TRIGMo
     m_TRIGMode = TRIGMode;
 
     doc_root = root;
-
-
 
 
     utils.addfd(m_epollfd, m_sockfd, true, m_TRIGMode);
@@ -44,8 +53,13 @@ void http_conn::init() {
     m_string = 0;           // 保存请求体数据的，在项目里没有，我自己加的这句
     m_file_address = 0;     // 在项目里没有，我自己加的这句
 
+    bytes_to_send = 0;
+    bytes_have_send = 0;
+    m_write_idx = 0;
+
     memset(m_read_buf, '\0', READ_BUFFER_SIZE);
     memset(m_real_file, '\0', FILENAME_LEN);
+    memset(m_write_buf, '\0', WRITE_BUFFER_SIZE);
 }
 
 void http_conn::close_conn(bool real_close) {
@@ -104,13 +118,18 @@ bool http_conn::read_once() {
 void http_conn::process() {
 
     HTTP_CODE read_ret = process_read();  // 解析读进来的请求
-    if(read_ret == NO_REQUEST){    // 请求不完整，需要继续读取客户数据
+    if(read_ret == NO_REQUEST){    // 请求不完整，需要继续读取客户数据, 其他返回的状态不论是否成功，都要返回响应报文
         utils.modfd(m_epollfd, m_sockfd, EPOLLIN, m_TRIGMode);   // oneshot  重新添加
         return ;
     }
 
-    printf("线程池中的线程正在处理数据：该线程号是 %ld\n", pthread_self());
+//    printf("线程池中的线程正在处理数据：该线程号是 %ld\n", pthread_self());
 
+    bool write_ret = process_write();
+    if (!write_ret) {
+        close_conn();
+    }
+    utils.modfd(m_epollfd, m_sockfd, EPOLLOUT, m_TRIGMode);    //检测EPOLLOUT事件
 
 }
 
@@ -389,4 +408,97 @@ http_conn::HTTP_CODE http_conn::do_request() {
 }
 
 
+// ================================   生成响应报文
+bool http_conn::process_write(HTTP_CODE ret) {
 
+    switch (ret) {
+        case INTERNAL_ERROR:{
+            add_status_line(500, error_500_title);
+            add_headers(strlen(error_500_form));
+            if(!add_content(error_500_form))
+                return false;
+            break;
+        }
+        case BAD_REQUEST: {
+            add_status_line(404, error_404_title);
+            add_headers(strlen(error_404_form));
+            if(!add_content(error_404_form))
+                return false;
+            break;
+        }
+        case FORBIDDEN_REQUEST: {
+            add_status_line(403, error_403_title);
+            add_headers(strlen(error_403_form));
+            if(!add_content(error_403_form))
+                return false;
+            break;
+        }
+        case FILE_REQUEST: {
+            add_status_line(200, ok_200_title);
+            if(m_file_stat.st_size != 0) {
+                add_headers(m_file_stat.st_size);
+                m_iv[0].iov_base = m_write_buf;          // 下标是0的这是响应行和响应头
+                m_iv[0].iov_len = m_write_idx;
+                m_iv[1].iov_base = m_file_address;       // 下标1这是响应体，就是要返回html中的信息
+                m_iv[1].iov_len = m_file_stat.st_size;
+                m_iv_count = 2;
+                bytes_have_send = m_write_idx + m_file_stat.st_size;
+                return true;
+            }
+            else {
+                const char *ok_string = "<html><body></body></html>";   // 空白页吗
+                add_headers(strlen(ok_string));
+                if (!add_content(ok_string))
+                    return false;
+            }
+            break;
+        }
+        default:
+            return false;
+    }
+    // 出错了，就不要响应体了吗， 出错好像也没有响应体； 不是还是有响应体的，就是不采用聚集写了
+    m_iv[0].iov_base = m_write_buf;
+    m_iv[0].iov_len = m_write_idx;
+    m_iv_count = 1;
+    bytes_to_send = m_write_idx;
+    return true;
+}
+
+bool http_conn::add_response(const char *format, ...) {
+    if(m_write_idx >= WRITE_BUFFER_SIZE)
+        return false;
+    va_list arg_list;               // 可变参数列表
+    va_start( arg_list, format);    // 将变量arg_list初始化为传入参数
+
+    int len = vsnprintf(m_write_buf+m_write_idx, WRITE_BUFFER_SIZE-1-m_write_idx, format, arg_list);
+    if(len >= (WRITE_BUFFER_SIZE - 1 - m_write_idx)) {
+        va_end(arg_list);
+        return false;
+    }
+    m_write_idx += len;
+    va_end(arg_list);
+
+    return true;
+}
+
+bool http_conn::add_status_line(int status, const char *title) {
+    return add_response("%s %d %s\r\n", "HTTP/1.1", status, title);
+}
+bool http_conn::add_headers(int content_length) {
+    return add_content_length(content_length) && add_linger() && add_blank_line();
+}
+bool http_conn::add_content_length(int content_length) {
+    return add_response("Content-Length:%d\r\n", content_length);
+}
+bool http_conn::add_content_type() {
+    return add_response("Content-Type:%s\r\n", "text/html");
+}
+bool http_conn::add_linger() {
+    return add_response("Connection:%s\r\n", (m_linger == true) ? "keep-alive":"close");
+}
+bool http_conn::add_blank_line() {
+    return add_response("%s", "\r\n");
+}
+bool http_conn::add_content(const char *content) {
+    return add_response("%s", content);
+}
