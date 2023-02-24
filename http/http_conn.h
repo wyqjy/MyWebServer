@@ -81,16 +81,19 @@ public:
 
 private:
     void init();
+
+    // 解析数据相关
     CHECK_STATE m_check_state;   // 主状态机当前的所处状态
     int m_checked_idx;           // 当前正在分析的字符在读缓冲区的位置
     int m_start_line;
     char *get_line() {return m_read_buf + m_start_line; };  // 通过parse_line函数就将一段拆成了一行了，将原来的\r\n变成\0\0, 所以从这开始的就是一行的数据，到\0结束了
 
-    // 解析数据相关
     HTTP_CODE process_read();     // 对读入的数据进行解析   主状态机
-
     LINE_STATUS parse_line();     // 获取一行数据   从状态机
     HTTP_CODE parse_request_line(char *text);   // 解析请求行
+    HTTP_CODE parse_headers(char *text);         // 解析请求头
+    HTTP_CODE parse_content(char *text);        // 解析请求体
+    HTTP_CODE do_request();                     // 报文解析完后，对请求处理，看看请求的东西在不在之类的。
 
     // 解析出来的相关属性
     char m_real_file[FILENAME_LEN];  // 客户请求的目标文件的完整路径，其内容等于 doc_root + m_url, doc_root是网站根目录

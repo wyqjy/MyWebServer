@@ -130,14 +130,17 @@ http_conn::HTTP_CODE http_conn::process_read() {
         switch(m_check_state) {
             case CHECK_STATE_REQUESTLINE: {
                 ret = parse_request_line(text);
-                std::cout<<"ret: "<<ret<<std::endl;
-                printf("信息： %s %s\n", m_url, m_version);
                 if(ret == BAD_REQUEST)
                     return BAD_REQUEST;
                 break;
             }
             case CHECK_STATE_HEADER: {
-
+                ret = parse_headers(text);
+                if(ret == BAD_REQUEST)
+                        return BAD_REQUEST;
+                else if(ret == GET_REQUEST) {
+                    return do_request();
+                }
                 break;
             }
             case CHECK_STATE_CONTENT: {
@@ -170,6 +173,8 @@ http_conn::LINE_STATUS http_conn::parse_line() {
             }
             return LINE_BAD;
         }
+        //如果当前字符是\n，也有可能读取到完整行
+        //一般是上次读取到\r就到buffer末尾了，没有接收完整，再次接收时会出现这种情况
         else if(temp == '\n'){
             if(m_checked_idx > 1 && m_read_buf[m_checked_idx-1]== '\r'){    // 受到传输过来的报文大小和 本地m_read_buf的最大大小限制， 一条数据可能被分成多个报文，尤其是在请求体中
                 m_read_buf[m_checked_idx-1] = '\0';
@@ -179,6 +184,7 @@ http_conn::LINE_STATUS http_conn::parse_line() {
             return LINE_BAD;
         }
     }
+    //并没有找到\r\n，需要继续接收
     return LINE_OPEN;
 }
 
@@ -186,6 +192,10 @@ http_conn::LINE_STATUS http_conn::parse_line() {
 
 //解析http请求行，获得请求方法，目标url及http版本号       GET /test.html HTTP/1.1
 http_conn::HTTP_CODE http_conn::parse_request_line(char *text) {
+
+    //在HTTP报文中，请求行用来说明请求类型,要访问的资源以及所使用的HTTP版本，其中各个部分之间通过\t或空格分隔。
+    // 请求行中最先含有空格和\t任一字符的位置并返回
+
     m_url = strpbrk(text, " \t");   // 在第一个字符串里找到第一个匹配第二个字符串的一个字符就行   注意分解这里是一个空格加一个\t  就是匹配到空格或者\t都返回
     if(!m_url) {
         return BAD_REQUEST;  // 客户端请求语法错误
@@ -203,6 +213,8 @@ http_conn::HTTP_CODE http_conn::parse_request_line(char *text) {
     else
         return BAD_REQUEST;
 
+    //m_url此时跳过了第一个空格或\t字符，但不知道之后是否还有
+    //将m_url向后偏移，通过查找，继续跳过空格和\t字符，指向请求资源的第一个字符
     m_url += strspn(m_url, " \t");     // 检索字符串 str1 中第一个不在字符串 str2 中出现的字符下标。  这个有必要吗？上面不是已经把\t换成\0， 难道有两个连续的 \t
     m_version = strpbrk(m_url, " \t");
     if (!m_version)
@@ -226,7 +238,7 @@ http_conn::HTTP_CODE http_conn::parse_request_line(char *text) {
 
     if (!m_url || m_url[0] != '/')
         return BAD_REQUEST;
-    //当url为/时，显示判断界面
+    //当url为/时，显示欢迎界面
     if (strlen(m_url) == 1)
         strcat(m_url, "judge.html");
 
@@ -235,3 +247,47 @@ http_conn::HTTP_CODE http_conn::parse_request_line(char *text) {
 
 
 }
+
+
+//解析http请求头
+//Host: 43.143.195.140:9999
+//Connection: keep-alive
+//Upgrade-Insecure-Requests: 1
+//User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36 Edg/110.0.1587.50
+//Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
+//Accept-Encoding: gzip, deflate
+//Accept-Language: zh-CN,zh;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6
+http_conn::HTTP_CODE http_conn::parse_headers(char *text) {
+
+    if(text[0] == '\0') {
+        if(m_content_length != 0 ){    // 存在请求体，一般post会有请求体
+            m_check_state = CHECK_STATE_CONTENT;   // 修改状态，变为解析请求体
+            return NO_REQUEST;    // 还需要继续解析
+        }
+        return GET_REQUEST;    // 解析完一个请求
+    }
+    else if(strncasecmp(text, "Connection:", 11) == 0) {
+        text += 11;
+        text += strspn(text, " \t");
+        if(strcasecmp(text, "keep-alive") == 0) {
+            m_linger = true;   // 保持连接
+        }
+    }
+    else if(strncasecmp(text, "Content-length:", 15) == 0) {
+        text += 15;
+        text += strspn(text, " \t");
+        m_content_length = atol(text);
+    }
+    else if(strncasecmp(text, "Host:", 5) == 0) {
+        text += 5;
+        text += strspn(text, " \t");
+        m_host = text;
+    }
+    else{       // 对于其他信息，不加以解析
+        printf("oop! unknow header: %s\n", text);
+    }
+    return NO_REQUEST;
+}
+
+
+

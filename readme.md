@@ -66,34 +66,39 @@ A： 这会不会是和浏览器有关，有的浏览器发送的请求报文就
   
 [-23.02.24]
 
-注意： 解析请求行的时候，分解是一个空格加一个\t   " \t"
+1. 注意： 解析请求行的时候，分解是一个空格加一个\t   " \t"
 
-char*  和char[] 有一个是常量
+2. char*  和char[] 有一个是常量
 另写了一个程序，通过char*  直接等于一段字符串，是不能通过指针解引用来改变其中一个字符的，通过键盘录入也不能改，让其等于另一个字符数组却可以。  
 相当于让这个字符指针指向了这个数据首地址了
-```C++
-#include <iostream>
-#include <cstring>
-#include <cstdio>
-using namespace std;
-int main() {
+    ```C++
+    #include <iostream>
+    #include <cstring>
+    #include <cstdio>
+    using namespace std;
+    int main() {
+    
+        char S[10000] = "GET /test.html HTTP/1.1";
+        char* text = 0;
+    //    text = "GET /test.html HTTP/1.1";  // 不能通过地址改其中一个字符
+        text = S;
+    //    printf("%s\n", text);
+    //    *(text+3) = 'x';
+    //    printf("=== %s\n", text);
+    
+        char* m_url = strpbrk(text, " \t");
+        printf("--- Start%s\n", m_url);
+        *m_url++ = '\0';
+        printf("通过\n");
+    
+        char *method = text;
+        printf("method: %s\n", method);
+        return 0;
+    }
+    ```
 
-    char S[10000] = "GET /test.html HTTP/1.1";
-    char* text = 0;
-//    text = "GET /test.html HTTP/1.1";  // 不能通过地址改其中一个字符
-    text = S;
-//    printf("%s\n", text);
-//    *(text+3) = 'x';
-//    printf("=== %s\n", text);
+3. m_linger在哪里用到的 保持连接，就是不会close_conn吗？
 
-    char* m_url = strpbrk(text, " \t");
-    printf("--- Start%s\n", m_url);
-    *m_url++ = '\0';
-    printf("通过\n");
 
-    char *method = text;
-    printf("method: %s\n", method);
-    return 0;
-}
-```
+
 
