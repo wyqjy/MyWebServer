@@ -58,3 +58,42 @@ User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (
 Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
 Accept-Encoding: gzip, deflate
 Accept-Language: zh-CN,zh;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6
+
+Q： 对于请求行的解析中，报文里url没有http://XXX.XXX.XXX.XXX什么的，却也需要加以判断吗？  
+A： 这会不会是和浏览器有关，有的浏览器发送的请求报文就有这个前缀，所以才会去判断一下
+
+---
+  
+[-23.02.24]
+
+注意： 解析请求行的时候，分解是一个空格加一个\t   " \t"
+
+char*  和char[] 有一个是常量
+另写了一个程序，通过char*  直接等于一段字符串，是不能通过指针解引用来改变其中一个字符的，通过键盘录入也不能改，让其等于另一个字符数组却可以。  
+相当于让这个字符指针指向了这个数据首地址了
+```C++
+#include <iostream>
+#include <cstring>
+#include <cstdio>
+using namespace std;
+int main() {
+
+    char S[10000] = "GET /test.html HTTP/1.1";
+    char* text = 0;
+//    text = "GET /test.html HTTP/1.1";  // 不能通过地址改其中一个字符
+    text = S;
+//    printf("%s\n", text);
+//    *(text+3) = 'x';
+//    printf("=== %s\n", text);
+
+    char* m_url = strpbrk(text, " \t");
+    printf("--- Start%s\n", m_url);
+    *m_url++ = '\0';
+    printf("通过\n");
+
+    char *method = text;
+    printf("method: %s\n", method);
+    return 0;
+}
+```
+

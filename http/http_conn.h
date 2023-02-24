@@ -5,6 +5,8 @@
 #ifndef MYWEBSERVER_HTTP_CONN_H
 #define MYWEBSERVER_HTTP_CONN_H
 
+#include <iostream>
+
 #include <sys/epoll.h>
 #include <sys/types.h>
 #include <netinet/in.h>
@@ -20,6 +22,11 @@
 
 class http_conn{
 public:
+
+    static const int FILENAME_LEN = 200;   // 请求的完整的路径url的最大长度
+    static const int READ_BUFFER_SIZE = 2048;
+    static const int WRITE_BUFFER_SIZE = 1024;
+
     // 报文的请求方法，目前只会用到GET和POST
     enum METHOD
     {
@@ -73,6 +80,7 @@ public:
 
 
 private:
+    void init();
     CHECK_STATE m_check_state;   // 主状态机当前的所处状态
     int m_checked_idx;           // 当前正在分析的字符在读缓冲区的位置
     int m_start_line;
@@ -80,23 +88,24 @@ private:
 
     // 解析数据相关
     HTTP_CODE process_read();     // 对读入的数据进行解析   主状态机
-    HTTP_CODE parse_request_line(char *text);
 
-    LINE_STATUS parse_line();     // 解析一行数据   从状态机
+    LINE_STATUS parse_line();     // 获取一行数据   从状态机
+    HTTP_CODE parse_request_line(char *text);   // 解析请求行
 
     // 解析出来的相关属性
+    char m_real_file[FILENAME_LEN];  // 客户请求的目标文件的完整路径，其内容等于 doc_root + m_url, doc_root是网站根目录
     char *m_url;                // 要找的本地资源的路径，一定以 / 开头
     char *m_version;
     METHOD m_method;
-
+    char *m_host;
     int cgi;        //是否启用的POST
-
+    int m_content_length;   // http请求消息的总长度
+    bool m_linger;          // http请求是否保持连接
 
 
 
 public:   // 读写数据相关
-    static const int READ_BUFFER_SIZE = 2048;
-    static const int WRITE_BUFFER_SIZE = 1024;
+
 
     bool read_once();   // 一次性读取数据
 
@@ -105,6 +114,7 @@ public:   // 读写数据相关
 private:   // 读写数据相关
     char m_read_buf[READ_BUFFER_SIZE];   // 保存读入的数据
     int m_read_idx;                      // 已经读入了多少数据
+
 
 public:
     static int m_epollfd;     // epollfd

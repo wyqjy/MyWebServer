@@ -14,13 +14,35 @@ void http_conn::init(int sockfd, const sockaddr_in &addr, int TRIGMode) {
     m_TRIGMode = TRIGMode;
 
 
+
+
+
+
+    utils.addfd(m_epollfd, m_sockfd, true, m_TRIGMode);
+    m_user_count++;
+
+    init();
+
+
+}
+
+void http_conn::init() {
     m_read_idx = 0;
     m_check_state = CHECK_STATE_REQUESTLINE;
     m_checked_idx = 0;
     m_start_line = 0;
 
 
-    utils.addfd(m_epollfd, m_sockfd, true, m_TRIGMode);
+    m_url = 0;
+    m_version = 0;
+    m_method = GET;
+    cgi = 0;
+    m_host = 0;
+    m_content_length = 0;
+    m_linger = false;
+
+    memset(m_read_buf, '\0', READ_BUFFER_SIZE);
+    memset(m_real_file, '\0', FILENAME_LEN);
 }
 
 void http_conn::close_conn(bool real_close) {
@@ -81,11 +103,11 @@ bool http_conn::read_once() {
 
 void http_conn::process() {
 
-//    HTTP_CODE read_ret = process_read();  // 解析读进来的请求
-//    if(read_ret == NO_REQUEST){    // 请求不完整，需要继续读取客户数据
-//        utils.modfd(m_epollfd, m_sockfd, EPOLLIN, m_TRIGMode);   // oneshot  重新添加
-//        return ;
-//    }
+    HTTP_CODE read_ret = process_read();  // 解析读进来的请求
+    if(read_ret == NO_REQUEST){    // 请求不完整，需要继续读取客户数据
+        utils.modfd(m_epollfd, m_sockfd, EPOLLIN, m_TRIGMode);   // oneshot  重新添加
+        return ;
+    }
 
     printf("线程池中的线程正在处理数据：该线程号是 %ld\n", pthread_self());
 
@@ -95,6 +117,7 @@ void http_conn::process() {
 
 // =================================   对读进来  请求的解析
 http_conn::HTTP_CODE http_conn::process_read() {
+
     LINE_STATUS line_status = LINE_OK;   // 读取的一行的状态
     HTTP_CODE ret = NO_REQUEST;
     char *text = 0;
@@ -107,9 +130,14 @@ http_conn::HTTP_CODE http_conn::process_read() {
         switch(m_check_state) {
             case CHECK_STATE_REQUESTLINE: {
                 ret = parse_request_line(text);
+                std::cout<<"ret: "<<ret<<std::endl;
+                printf("信息： %s %s\n", m_url, m_version);
+                if(ret == BAD_REQUEST)
+                    return BAD_REQUEST;
                 break;
             }
             case CHECK_STATE_HEADER: {
+
                 break;
             }
             case CHECK_STATE_CONTENT: {
@@ -156,9 +184,9 @@ http_conn::LINE_STATUS http_conn::parse_line() {
 
 
 
-//解析请求头          GET /test.html HTTP/1.1
+//解析http请求行，获得请求方法，目标url及http版本号       GET /test.html HTTP/1.1
 http_conn::HTTP_CODE http_conn::parse_request_line(char *text) {
-    m_url = strpbrk(text, "\t");   // 在第一个字符串里找到第一个匹配第二个字符串的字符
+    m_url = strpbrk(text, " \t");   // 在第一个字符串里找到第一个匹配第二个字符串的一个字符就行   注意分解这里是一个空格加一个\t  就是匹配到空格或者\t都返回
     if(!m_url) {
         return BAD_REQUEST;  // 客户端请求语法错误
     }
@@ -184,7 +212,7 @@ http_conn::HTTP_CODE http_conn::parse_request_line(char *text) {
     m_version += strspn(m_version, " \t");
     if (strcasecmp(m_version, "HTTP/1.1") != 0)
         return BAD_REQUEST;
-    if (strncasecmp(m_url, "http://", 7) == 0)      // 只比较前7个字符     我看读进来的报文直接就是/test.html，前面没有http啥的啊， 需要这样吗
+    if (strncasecmp(m_url, "http://", 7) == 0)      // 只比较前7个字符     我看读进来的报文直接就是/test.html，前面没有http啥的啊， 需要这样吗？  可能不同浏览器发送的报文不一样吧，有的会带有完整的URL
     {
         m_url += 7;
         m_url = strchr(m_url, '/');                     // 在参数 str 所指向的字符串中搜索第一次出现字符 c（一个无符号字符）的位置
@@ -201,6 +229,7 @@ http_conn::HTTP_CODE http_conn::parse_request_line(char *text) {
     //当url为/时，显示判断界面
     if (strlen(m_url) == 1)
         strcat(m_url, "judge.html");
+
     m_check_state = CHECK_STATE_HEADER;
     return NO_REQUEST;
 
