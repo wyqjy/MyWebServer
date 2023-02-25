@@ -20,6 +20,7 @@
 #include <unistd.h>
 #include <sys/mman.h>
 #include <cstdarg>
+#include <sys/uio.h>
 
 #include "../timer/lst_timer.h"
 
@@ -136,17 +137,14 @@ private:
 
 
 public:   // 读写数据相关
-
-
     bool read_once();   // 一次性读取数据
-
-
+    bool write();       // 向socket写数据
 
 private:   // 读写数据相关
     char m_read_buf[READ_BUFFER_SIZE];   // 保存读入的数据
     int m_read_idx;                      // 已经读入了多少数据
 
-    char m_write_buf[WRITE_BUFFER_SIZE];   // 写缓冲区
+    char m_write_buf[WRITE_BUFFER_SIZE];   // 写缓冲区  这里是响应行和响应头，  若正常请求，响应体的数据在m_file_address(内存映射中)
 
 
 

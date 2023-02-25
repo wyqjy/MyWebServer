@@ -194,4 +194,16 @@ void WebServer::dealwithread(int sockfd) {
 }
 void WebServer::dealwithwrite(int sockfd) {
 
+    if(m_trigmode == 0) {
+        // Proactor
+
+    }
+    else {
+        if(users[sockfd].write()){
+
+        }
+        else{
+            users[sockfd].close_conn();
+        }
+    }
 }

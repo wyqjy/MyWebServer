@@ -45,20 +45,22 @@ C++11那版的应该是先将读取进来的数据，分解成一个map，之后
 
 **写了一篇博客，具体可见博客**
 
+当所有数据发送完后，又回设置成EPOLLIN模式，不会检测EPOLLOUT(在write函数中，若数据一次没发送完，会不断触发EPOLLOUT,发送完转为EPOLLIN)
 
 Q：其实有个疑问，没有注册检测EPOLLOUT事件，为什么可以检测到EPOLLOUT呢？  
 A：设置了，在webserver的项目中线程池回调函数process的最后，响应数据准备好但是还没写之后，要修改的状态是EPOLLOUT，那什么时候将其重置呢？
 
 请求报文  
- GET /test.html HTTP/1.1
-Host: 43.143.195.140:9999
-Connection: keep-alive
-Upgrade-Insecure-Requests: 1
-User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36 Edg/110.0.1587.50
-Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
-Accept-Encoding: gzip, deflate
-Accept-Language: zh-CN,zh;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6
-
+ GET /test.html HTTP/1.1  
+Host: 43.143.195.140:9999  
+Connection: keep-alive  
+Upgrade-Insecure-Requests: 1  
+User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36 Edg/110.0.1587.50  
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7  
+Accept-Encoding: gzip, deflate  
+Accept-Language: zh-CN,zh;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6  
+\r\n  
+  
 Q： 对于请求行的解析中，报文里url没有http://XXX.XXX.XXX.XXX什么的，却也需要加以判断吗？  
 A： 这会不会是和浏览器有关，有的浏览器发送的请求报文就有这个前缀，所以才会去判断一下
 
@@ -141,3 +143,17 @@ A： 这会不会是和浏览器有关，有的浏览器发送的请求报文就
 
 9. 可变参数列表 va_list 
     iovec 
+
+---
+
+[-23.02.25]
+
+1. Q: write()函数 向socket写数据的时候，有没有必要在EAGAIN的时候，重新mod(EPOLLOUT)?  
+   A:有必要的，哪怕写缓冲区由满变成不满也会触发EPOLLOUT, 但是之前设置了oneshot， 在没有重置之前还是不会触发的。  
+    所以有个注意的地方，在设置了oneshot后，如果一次触发处理完后，一定要重置oneshot。
+
+    Q：那就带来一个问题，如果在设置了oneshot后，线程在处理请求时，又来了新的请求，这个请求不会被触发EPOLLIN，那是先放在epoll中吗（等重置后直接触发），不会直接丢弃吧  
+        写完后实验一下
+
+2. Q：http_conn::write()函数中，对于发送一次后，m_iv的位置更新，有一处不对的地方  
+   A：已经更改过来   

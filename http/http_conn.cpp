@@ -51,7 +51,7 @@ void http_conn::init() {
     m_linger = false;
 
     m_string = 0;           // 保存请求体数据的，在项目里没有，我自己加的这句
-    m_file_address = 0;     // 在项目里没有，我自己加的这句
+//    m_file_address = 0;     // 在项目里没有，我自己加的这句   unmap()会做
 
     bytes_to_send = 0;
     bytes_have_send = 0;
@@ -114,6 +114,68 @@ bool http_conn::read_once() {
 
 }
 
+// 向socket写数据
+bool http_conn::write() {
+        int temp = 0;
+
+        if(bytes_to_send == 0) {   // 所有数据都发送出去了，转换检测事件为epollin, 并重新初始化 http_conn这个对象的数据
+            utils.modfd(m_epollfd, m_sockfd, EPOLLIN, m_TRIGMode);
+            init();
+            return true;
+        }
+
+        while(1) {
+            // 分散写  writev  有多块的内存不是连续的，他就可以一起写进去  (不是多块内存同时写，先写完一块再写另一块)
+            temp = writev(m_sockfd, m_iv, m_iv_count);
+            if(temp < 0) {
+
+                // 如果TCP写缓冲没有空间，则等待下一轮EPOLLOUT事件，虽然在此期间，
+                // 服务器无法立即接收到同一客户的下一个请求，但可以保证连接的完整性。
+                if(errno == EAGAIN) {     // 写缓冲满了
+                    utils.modfd(m_epollfd, m_sockfd, EPOLLOUT, m_TRIGMode);   // 这句是不有点多余，没有改变这就是默认状态， 直接返回true不行吗？ 还是会触发EPOLLOUT。 【不对， 重点在于oneshot, 不是啊， 由满变为不满还是会触发out的】
+                    return true;
+                }
+                unmap();
+                return false;
+            }
+
+            bytes_have_send += temp;
+            bytes_to_send -= temp;
+
+            // 更新下一次拷贝的内存起始位置
+            if (bytes_have_send >= m_iv[0].iov_len) {
+                m_iv[0].iov_len = 0;
+                m_iv[1].iov_base = m_file_address + (bytes_have_send - m_write_idx);
+                m_iv[1].iov_len = bytes_to_send;
+            }
+            else {
+                m_iv[0].iov_base = m_write_buf + bytes_have_send;
+//                m_iv[0].iov_len = m_iv[0].iov_len - bytes_have_send;   // 感觉这个不对呢？ bytes_have_send是累加的，这里会把上次减过的再减一次
+                m_iv[0].iov_len = m_iv[0].iov_len - temp;         //这个才是这次发送的，   同等表达   m_write_idx - bytes_have_send 或者  bytes_to_send - m_iv[1].iov_len
+            }
+
+            if (bytes_to_send <= 0) {
+                unmap();
+                utils.modfd(m_epollfd, m_sockfd, EPOLLIN, m_TRIGMode);
+
+                if(m_linger){
+                    init();
+                    return true;
+                }
+                else{
+                    return false;
+                }
+            }
+        }
+}
+
+void http_conn::unmap() {
+    if (m_file_address) {
+        munmap(m_file_address, m_file_stat.st_size);
+        m_file_address = 0;
+    }
+}
+
 
 void http_conn::process() {
 
@@ -125,7 +187,7 @@ void http_conn::process() {
 
 //    printf("线程池中的线程正在处理数据：该线程号是 %ld\n", pthread_self());
 
-    bool write_ret = process_write();
+    bool write_ret = process_write(read_ret);
     if (!write_ret) {
         close_conn();
     }
@@ -446,7 +508,7 @@ bool http_conn::process_write(HTTP_CODE ret) {
                 return true;
             }
             else {
-                const char *ok_string = "<html><body></body></html>";   // 空白页吗
+                const char *ok_string = "<html><body></body></html>";   // 请求的资源大小为0，返回html空白页
                 add_headers(strlen(ok_string));
                 if (!add_content(ok_string))
                     return false;
@@ -456,7 +518,7 @@ bool http_conn::process_write(HTTP_CODE ret) {
         default:
             return false;
     }
-    // 出错了，就不要响应体了吗， 出错好像也没有响应体； 不是还是有响应体的，就是不采用聚集写了
+    // 出错了，就不要响应体了吗， 出错好像也没有响应体； 不对， 还是有响应体的，就是不采用聚集写了
     m_iv[0].iov_base = m_write_buf;
     m_iv[0].iov_len = m_write_idx;
     m_iv_count = 1;
@@ -476,7 +538,7 @@ bool http_conn::add_response(const char *format, ...) {
         return false;
     }
     m_write_idx += len;
-    va_end(arg_list);
+    va_end(arg_list);   // 清空可变参数列表
 
     return true;
 }
