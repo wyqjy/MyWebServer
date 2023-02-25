@@ -90,7 +90,7 @@ bool http_conn::read_once() {
             return false;
         }
 
-        printf("读取到的数据:\n %s\n", m_read_buf);
+//        printf("LT 读取到的数据:\n %s\n", m_read_buf);
         return true;
     }
     else {  // ET 边缘触发   非阻塞下边缘触发需要一次性将所有数据都读出
@@ -108,7 +108,7 @@ bool http_conn::read_once() {
 
         }
 
-        printf("读取到的数据:\n %s\n", m_read_buf);
+        // printf("ET 读取到的数据:\n %s\n", m_read_buf);
         return true;
     }
 
@@ -116,6 +116,7 @@ bool http_conn::read_once() {
 
 // 向socket写数据
 bool http_conn::write() {
+
         int temp = 0;
 
         if(bytes_to_send == 0) {   // 所有数据都发送出去了，转换检测事件为epollin, 并重新初始化 http_conn这个对象的数据
@@ -150,7 +151,7 @@ bool http_conn::write() {
             }
             else {
                 m_iv[0].iov_base = m_write_buf + bytes_have_send;
-//                m_iv[0].iov_len = m_iv[0].iov_len - bytes_have_send;   // 感觉这个不对呢？ bytes_have_send是累加的，这里会把上次减过的再减一次
+      //          m_iv[0].iov_len = m_iv[0].iov_len - bytes_have_send;   // 感觉这个不对呢？ bytes_have_send是累加的，这里会把上次减过的再减一次
                 m_iv[0].iov_len = m_iv[0].iov_len - temp;         //这个才是这次发送的，   同等表达   m_write_idx - bytes_have_send 或者  bytes_to_send - m_iv[1].iov_len
             }
 
@@ -406,10 +407,10 @@ http_conn::HTTP_CODE http_conn::do_request() {
         //CGI多进程登录校验
     }
 
-    if(*(p+1) == '0') {     // 请求跳转注册界面
+    if(*(p + 1) == '0') {     // 请求跳转注册界面
         char *m_url_real = (char *)malloc(sizeof(char) * 200);
         strcpy(m_url_real, "/register.html");
-        strncpy(m_real_file+len, m_url_real, sizeof(m_url_real));     // 为啥不用strcat呢?   用这个函数的话，如果不是将另一个函数完全复制过去，比如只复制前几个字符，在最后需要手动加 \0
+        strncpy(m_real_file+len, m_url_real, strlen(m_url_real));     // 为啥不用strcat呢?   用这个函数的话，如果不是将另一个函数完全复制过去，比如只复制前几个字符，在最后需要手动加 \0
 
         free(m_url_real);
     }
@@ -504,7 +505,7 @@ bool http_conn::process_write(HTTP_CODE ret) {
                 m_iv[1].iov_base = m_file_address;       // 下标1这是响应体，就是要返回html中的信息
                 m_iv[1].iov_len = m_file_stat.st_size;
                 m_iv_count = 2;
-                bytes_have_send = m_write_idx + m_file_stat.st_size;
+                bytes_to_send = m_write_idx + m_file_stat.st_size;
                 return true;
             }
             else {

@@ -140,7 +140,7 @@ void WebServer::eventLoop() {
 
         }
 
-        std::cout<<"处理了"<<number<<"个事件"<<std::endl;
+//        std::cout<<"处理了"<<number<<"个事件"<<std::endl;
 
     }
 
@@ -196,14 +196,14 @@ void WebServer::dealwithwrite(int sockfd) {
 
     if(m_trigmode == 0) {
         // Proactor
-
-    }
-    else {
         if(users[sockfd].write()){
-
+            printf("--- 发送一次\n");
         }
         else{
             users[sockfd].close_conn();
         }
+    }
+    else {
+
     }
 }
