@@ -34,7 +34,7 @@ void WebServer::init(string user, string password, string databaseName, int sql_
     m_user = user;
     m_passeord = password;
     m_databaseName = databaseName;
-    sql_num = sql_num;
+    m_sql_num = sql_num;
 
     m_port = port;
     m_thread_num = thread_num;
@@ -81,7 +81,7 @@ void WebServer::thread_pool() {
 void WebServer::sql_pool() {
     // 初始化数据库连接池
     m_connPool = connection_pool::GetInstance();
-    m_connPool->init("43.143.195.140", m_user, m_passeord, m_databaseName, 3306, sql_num,  m_close_log);
+    m_connPool->init("43.143.195.140", m_user, m_passeord, m_databaseName, 3306, m_sql_num,  m_close_log);
 
     users->initmysql_result(m_connPool);
 }

@@ -82,9 +82,11 @@ void http_conn::initmysql_result(connection_pool *connPool) {
 
     // 将用户名和密码存到map中
     while(MYSQL_ROW row = mysql_fetch_row(result)) {
+
         string temp1(row[0]);
         string temp2(row[1]);
         users[temp1] = temp2;
+        cout<<temp1<<" "<<temp2<<endl;
     }
 
 }

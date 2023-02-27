@@ -80,7 +80,7 @@ private:
     string m_user;
     string m_passeord;
     string m_databaseName;
-    int sql_num;
+    int m_sql_num;
 
     // 日志相关
     int m_close_log;
