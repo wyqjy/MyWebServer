@@ -33,10 +33,12 @@ public:
     WebServer();
     ~WebServer();
 
-    void init(int port, int thread_num, int trigmode=0, int actor_model=0);
+    void init(string user, string password, string databaseName, int sql_num, int close_log, int port, int thread_num, int trigmode=0, int actor_model=0);
 
     void thread_pool();
     void trig_mode();
+
+    void sql_pool();    // 初始化数据库连接池
 
     void eventListen();     // 创建监听socket 创建epoll
     void eventLoop();       // 运行
@@ -51,6 +53,7 @@ private:
     int m_listenfd;     // 监听的文件描述符
     int m_port;         // 端口号
     int m_epollfd;      // epoll文件描述符
+
 
 
     http_conn *users;   // 建立连接的客户端，用connfd作为下标可以找到对应的连接信息
@@ -74,6 +77,13 @@ private:
 
     //  数据库相关
     connection_pool *m_connPool;
+    string m_user;
+    string m_passeord;
+    string m_databaseName;
+    int sql_num;
+
+    // 日志相关
+    int m_close_log;
 
     // 定时器相关， 也包括了向epoll中注册 新连接
     Utils utils;

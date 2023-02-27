@@ -36,14 +36,14 @@ private:
     sem m_queuestat;        // 判断请求队列中是否有任务需要处理  信号量
 
 
-    connection_pool *m_connPool;  // 数据库连接池    ------------------
+    connection_pool *m_connPool;  // 数据库连接池
     int m_actor_model;    // 模型切换
 };
 
 
 template<typename T>
 threadpool<T>::threadpool(int actor_model, connection_pool *connPool, int thread_number, int max_requests) : m_thread_number(thread_number),
-                            m_max_request(max_requests), m_actor_model(actor_model), m_pthread(NULL), m_connPool(NULL)  {
+                            m_max_request(max_requests), m_actor_model(actor_model), m_pthread(NULL), m_connPool(connPool)  {
     if( thread_number <= 0 || max_requests <= 0) {
         throw std::exception();
     }
@@ -118,6 +118,7 @@ void threadpool<T>::run() {
             request->process();   // 未完
         }
         else {                       // Proactor  主线程来处理读写  以同步的方式模拟异步
+            connectionRAII mysqlcon(&request->mysql, m_connPool);
             request->process();
         }
 

@@ -61,8 +61,8 @@ public:
     ~connectionRAII();
 
 private:
-    MYSQL *conRAII;
-    connection_pool *pollRAII;
+    MYSQL *conRAII;                 // 一条连接
+    connection_pool *pollRAII;      // 连接池
 
 };
 

@@ -102,10 +102,13 @@ int connection_pool::GetFreeConn() {
     return this->m_FreeConn;
 }
 
+// RAII机制销毁连接池
 connection_pool::~connection_pool() {
     DestroyPool();
 }
 
+
+// 将数据库连接的获取与释放通过RAII机制封装，避免手动释放。
 connectionRAII::connectionRAII(MYSQL **SQL, connection_pool *connPool) {
     *SQL = connPool->GetConnection();
     conRAII = *SQL;

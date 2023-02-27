@@ -19,6 +19,9 @@ int http_conn::m_epollfd = -1;
 int http_conn::m_user_count = 0;
 Utils http_conn::utils = Utils();
 
+locker m_lock;
+map<string, string> users;
+
 void http_conn::init(int sockfd, const sockaddr_in &addr, char *root, int TRIGMode) {
     m_sockfd = sockfd;
     m_address = addr;
@@ -36,6 +39,9 @@ void http_conn::init(int sockfd, const sockaddr_in &addr, char *root, int TRIGMo
 }
 
 void http_conn::init() {
+
+    mysql = NULL;
+
     m_read_idx = 0;
     m_check_state = CHECK_STATE_REQUESTLINE;
     m_checked_idx = 0;
@@ -60,6 +66,27 @@ void http_conn::init() {
     memset(m_read_buf, '\0', READ_BUFFER_SIZE);
     memset(m_real_file, '\0', FILENAME_LEN);
     memset(m_write_buf, '\0', WRITE_BUFFER_SIZE);
+}
+
+void http_conn::initmysql_result(connection_pool *connPool) {
+    MYSQL *mysql = NULL;
+    connectionRAII mysqlcon(&mysql, connPool);
+
+    // 将user表中将用户名和密码拿出来
+    if(mysql_query(mysql, "SELECT name, passwd FROM user")){
+        printf("出错\n");
+    }
+
+    // 从表中检索出的完整结果集
+    MYSQL_RES *result = mysql_store_result(mysql);
+
+    // 将用户名和密码存到map中
+    while(MYSQL_ROW row = mysql_fetch_row(result)) {
+        string temp1(row[0]);
+        string temp2(row[1]);
+        users[temp1] = temp2;
+    }
+
 }
 
 void http_conn::close_conn(bool real_close) {
@@ -400,11 +427,62 @@ http_conn::HTTP_CODE http_conn::do_request() {
     // 处理cgi=1（POST） 这里就是登录和注册
     if(cgi == 1 && (*(p+1) == '2' || *(p+1) == '3') ) {
 
-        //根据标志判断是登录检测还是注册检测
+        char *m_url_real = (char *)malloc(sizeof(char) * 200);
+        strcpy(m_url_real, "/");
+        strcat(m_url_real, m_url + 2);
+        strncpy(m_real_file + len, m_url_real, FILENAME_LEN - len - 1);
+        free(m_url_real);
 
-        //同步线程登录校验
+        //将用户名和密码提取出来
+        //user=123&passwd=123
+        char name[100], password[100];
+        int i;
+        for (i = 5; m_string[i] != '&'; ++i)    // m_string 保存的是请求头的数据
+            name[i - 5] = m_string[i];
+        name[i - 5] = '\0';
 
-        //CGI多进程登录校验
+        int j = 0;
+        for (i = i + 10; m_string[i] != '\0'; ++i, ++j)
+            password[j] = m_string[i];
+        password[j] = '\0';
+
+        if (*(p + 1) == '3')
+        {
+            //如果是注册，先检测数据库中是否有重名的
+            //没有重名的，进行增加数据
+            char *sql_insert = (char *)malloc(sizeof(char) * 200);
+            strcpy(sql_insert, "INSERT INTO user(username, passwd) VALUES(");
+            strcat(sql_insert, "'");
+            strcat(sql_insert, name);
+            strcat(sql_insert, "', '");
+            strcat(sql_insert, password);
+            strcat(sql_insert, "')");
+
+            if (users.find(name) == users.end())
+            {
+                m_lock.lock();
+                int res = mysql_query(mysql, sql_insert);
+                users.insert(pair<string, string>(name, password));
+                m_lock.unlock();
+
+                if (!res)
+                    strcpy(m_url, "/log.html");
+                else
+                    strcpy(m_url, "/registerError.html");
+            }
+            else
+                strcpy(m_url, "/registerError.html");
+        }
+            //如果是登录，直接判断
+            //若浏览器端输入的用户名和密码在表中可以查找到，返回1，否则返回0
+        else if (*(p + 1) == '2')
+        {
+            if (users.find(name) != users.end() && users[name] == password)
+                strcpy(m_url, "/welcome.html");
+            else
+                strcpy(m_url, "/logError.html");
+        }
+
     }
 
     if(*(p + 1) == '0') {     // 请求跳转注册界面

@@ -21,8 +21,11 @@
 #include <sys/mman.h>
 #include <cstdarg>
 #include <sys/uio.h>
+#include <map>
 
+#include "../lock/locker.h"
 #include "../timer/lst_timer.h"
+#include "../CGImysql/sql_connection_pool.h"
 
 class http_conn{
 public:
@@ -81,6 +84,7 @@ public:
     void close_conn(bool real_close = true);
 
     void process();
+    void initmysql_result(connection_pool *connPool);
 
 
 private:
@@ -158,6 +162,9 @@ public:    // 基本信息
     int m_TRIGMode;           // 这个连接的触发模式
 
     char *doc_root;
+
+    MYSQL *mysql;           // 数据库连接，一条，从连接池中拿出来的，用完后RAII机制自动调用析构函数，还回去
+//    map<string,string> m_users;
 
     static Utils utils;              // 包含定时器和 把socketfd加入到epoll中  这里主要用到在客户端连接进来的时候，要将connfd注册到epoll中
 
