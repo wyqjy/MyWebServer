@@ -411,6 +411,7 @@ http_conn::HTTP_CODE http_conn::parse_content(char *text) {
         text[m_content_length] = '\0';
         // POST请求中最后为输入的用户名和密码
         m_string = text;
+//        printf("请求体： %s %s\n", text, m_string);
         return GET_REQUEST;
     }
     return NO_REQUEST;
@@ -448,12 +449,14 @@ http_conn::HTTP_CODE http_conn::do_request() {
             password[j] = m_string[i];
         password[j] = '\0';
 
+//        printf("u: %s  p: %s \n", name, password);
+
         if (*(p + 1) == '3')
         {
             //如果是注册，先检测数据库中是否有重名的
             //没有重名的，进行增加数据
             char *sql_insert = (char *)malloc(sizeof(char) * 200);
-            strcpy(sql_insert, "INSERT INTO user(username, passwd) VALUES(");
+            strcpy(sql_insert, "INSERT INTO user(name, passwd) VALUES(");
             strcat(sql_insert, "'");
             strcat(sql_insert, name);
             strcat(sql_insert, "', '");
