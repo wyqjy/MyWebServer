@@ -166,7 +166,7 @@ public:    // 基本信息
     MYSQL *mysql;           // 数据库连接，一条，从连接池中拿出来的，用完后RAII机制自动调用析构函数，还回去
 //    map<string,string> m_users;
 
-    static Utils utils;              // 包含定时器和 把socketfd加入到epoll中  这里主要用到在客户端连接进来的时候，要将connfd注册到epoll中
+    Utils utils;              // 包含定时器和 把socketfd加入到epoll中  这里主要用到在客户端连接进来的时候，要将connfd注册到epoll中
 
 
 private:

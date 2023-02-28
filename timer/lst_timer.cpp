@@ -189,7 +189,8 @@ void Utils::modfd(int epollfd, int fd, int ev, int TRIGMode) {
 
 
 void Utils::sig_handler(int sig) {
-    //为保证函数的可重入性，保留原来的errno
+    //为保证函数的可重入性，保留原来的errno, 这是原来主程序的errno,之后进行定时器处理，可能会改变这个errno,等处理结束后，再变回去
+    //可重入性表示中断后再次进入该函数，环境变量与之前相同，不会丢失数据
     int save_errno = errno;
     int msg = sig;
     send(u_pipefd[1], (char *)&msg, 1, 0);
@@ -206,7 +207,7 @@ void Utils::addsig(int sig, void (*handler)(int), bool restart) {
         sa.sa_flags |= SA_RESTART;
     }
     sigfillset(&sa.sa_mask);    // 将信号集中所有标志位都置为1，表示阻塞这个信号
-    assert(sigaction(sig, &sa, NULL) != -1);
+    assert(sigaction(sig, &sa, NULL) != -1);    // 注册捕捉函数sigaction
 
 }
 
@@ -215,7 +216,7 @@ void Utils::addsig(int sig, void (*handler)(int), bool restart) {
 void Utils::timer_handler()
 {
     m_timer_lst.tick();
-    alarm(m_TIMESLOT);
+    alarm(m_TIMESLOT);          // 重新设置alarm， 为什么不用setitimer
 }
 
 void Utils::show_error(int connfd, const char *info) {

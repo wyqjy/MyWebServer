@@ -17,7 +17,7 @@ const char *error_500_form = "There was an unusual problem serving the request f
 
 int http_conn::m_epollfd = -1;
 int http_conn::m_user_count = 0;
-Utils http_conn::utils = Utils();
+//Utils http_conn::utils = Utils();
 
 locker m_lock;
 map<string, string> users;

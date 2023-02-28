@@ -25,10 +25,10 @@
 
 class util_timer;
 
-struct client_data {
+struct client_data {     // 这个和util_timer是你中有我，我中有你，为什么呢？ 难道是一种设计模式吗？
     sockaddr_in address;
     int sockfd;
-    util_timer *timer;
+    util_timer *timer;    // 感觉这个没啥用啊， 在webserver的dealread和dealwrite中用到
 };
 
 class util_timer {
@@ -39,6 +39,8 @@ public:
     time_t expire;      // 超过这个时间就要断掉这个连接
 
     void (* cb_func)(client_data *);       // 函数指针， 为什么不能放在类里面呢， 若是只需要一份static不行吗，需要内部数据也是同样的传参数   可能因为sh_handler是函数指针
+                                            // 不是，这个是将连接connfd从epoll中移除，关闭connfd,
+
     client_data *user_data;
     util_timer *prev;
     util_timer *next;

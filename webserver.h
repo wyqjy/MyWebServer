@@ -51,6 +51,13 @@ public:
     void dealwithwrite(int sockfd);  // 处理写数据， 发送
 
 
+    // 定时器相关
+    void timer(int connfd, struct sockaddr_in client_address);
+    void adjust_timer(util_timer *timer);
+    void deal_timer(util_timer *timer, int sockfd);
+    bool dealwithsignal(bool& timeout, bool& stop_server);
+
+
 private:
     int m_listenfd;     // 监听的文件描述符
     int m_port;         // 端口号
@@ -88,7 +95,11 @@ private:
     int m_close_log;
 
     // 定时器相关， 也包括了向epoll中注册 新连接
+private:
+    client_data *users_timer;    // 这是一个连接的信息，不是结点啊，没有前后指针，还没有链表的对象sort_timer_lst, 链表对象在utils里面
     Utils utils;
+public:
+    int m_pipefd[2];
 
 };
 

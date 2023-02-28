@@ -223,5 +223,28 @@ A： 这会不会是和浏览器有关，有的浏览器发送的请求报文就
 ---
 
 [-23.02.28]
-1. 定时器里面有对add_timer的重载，虽然在调整timer的时候，这样做可以少遍历一些结点，但还是有一个就够了吧 （把判断链表为空也加进去就行了）
-2. 定时器的整体结构是双向链表，用小根堆会不会更好
+1. 定时器里面有对add_timer的重载，虽然在调整timer的时候，这样做可以少遍历一些结点，但还是有一个就够了吧 （把判断链表为空也加进去就行了）  
+
+
+2. 定时器的整体结构是双向链表，用小根堆会不会更好  
+
+
+3. Utils::timer_handler() 里用的是alarm，每次都需要重新定时，可不可以用setitimer呢  
+    好像是这样，并不是每次固定时间去处理定时器，但时间一定是大于等于那个时间段的，处理连接或其他请求的优先级更高，而setitimer每固定时间后都会发送信号
+
+
+4. WebServer::eventListen() 中为什么创建完监听socket和epoll就alarm()了，此时还没有客户端连接进来呢？  
+    难道是这样更方便，但是当服务端空闲的时候，也会去每隔timeslot就检测一次定时器吧
+ 
+
+5. WebServer::eventLoop()中对于 else if ( events[i].events & (EPOLLRDHUP | EPOLLHUP | EPOLLERR) ) 这里：  
+    将连接的sockfd从epoll中移除了，对应的定时器删掉了，但是没有关闭users[sockfd]啊？  就是http_conn的对象, 没有调用users[sockfd].close_conn();
+    这个不需要，在lst_timer.cpp中的 cb_func(client_data *user_data)函数中，就关闭了sockfd文件描述符了，等再次分配这个文件描述符时，也会重新init这个http_conn对象
+
+    那么又为什么不直接使用users[sockfd].close_conn()呢， 用到的sockfd在users对象中也有  
+        应该就是代码冗余了，或者很可能是不同的人开发的
+    最后在webserver中用到的结束连接都是deal_timer, 而在http_conn中异常结束连接是close_conn
+
+6.  在lst_timer.h中对client_data和util_timer是你中有我，我中有你，有这个必要吗？  还是说这是某种设计模式呢
+    在lst_timer中的util_timer的指针在webserver中用到了，因为在webserver中存的是client_data 结点
+7. 我自己在http_conn中加入了一个static Utils, 后来将static去掉，变成普通的成员，之后将定义从listen转到loop

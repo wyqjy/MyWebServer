@@ -18,13 +18,20 @@ WebServer::WebServer() {
 //    strcat(m_root, root);
 
     m_root = "../root";
+
+    // 定时器
+    users_timer = new client_data[MAX_FD];
 }
 
 WebServer::~WebServer() {
     close(m_epollfd);
     close(m_listenfd);
 
+    close(m_pipefd[0]);
+    close(m_pipefd[1]);
+
     delete [] users;
+    delete [] users_timer;
     delete m_pool;
 }
 
@@ -113,14 +120,29 @@ void WebServer::eventListen() {    // 创建监听socket并监听  和创建epol
     m_epollfd = epoll_create(5);   //参数没有意义
     assert(m_epollfd != -1);
 
-    utils.init();
+    utils.init(TIMESLOT);
     // 向epoll注册监听socket fd 文件描述符， 注意不能设置成oneshot
     //对于监听的sockfd，最好使用水平触发模式，边缘触发模式会导致高并发情况下，有的客户端会连接不上。如果非要使用边缘触发，网上有的方案是用while来循环accept()。
     utils.addfd(m_epollfd, m_listenfd, false, m_LISTENTrigmode);
 
     http_conn::m_epollfd = m_epollfd;
 
-    http_conn::utils = utils;
+    // 创建一对套接字用于通信，项目中使用管道通信
+    ret = socketpair(PF_UNIX, SOCK_STREAM, 0, m_pipefd);
+    assert(ret != -1);
+    utils.setnonblocking(m_pipefd[1]);     // 设置管道写端非阻塞
+    utils.addfd(m_epollfd, m_pipefd[0], false, 0);  // 设置管道读端为ET非阻塞
+
+    utils.addsig(SIGPIPE, SIG_IGN);
+    utils.addsig(SIGALRM, utils.sig_handler, false);
+    utils.addsig(SIGTERM, utils.sig_handler, false);
+
+    alarm(TIMESLOT);     // 为什么在这里就加了alarm, 现在还没有客户端连接呢
+
+    Utils::u_pipefd = m_pipefd;
+    Utils::u_epollfd = m_epollfd;
+
+//    http_conn::utils = utils;
 
     std::cout<<"监听socket和epoll创建完成"<<std::endl;
 }
@@ -128,6 +150,7 @@ void WebServer::eventListen() {    // 创建监听socket并监听  和创建epol
 void WebServer::eventLoop() {
 
     bool stop_server = false;
+    bool timeout = false;  // 表示现在是否超时了   超时标志
 
     while(!stop_server) {
 
@@ -143,8 +166,16 @@ void WebServer::eventLoop() {
                     continue;
             }
             else if ( events[i].events & (EPOLLRDHUP | EPOLLHUP | EPOLLERR) ) {
-                // 客户端连接关闭
+                // 客户端连接关闭，移除对应的定时器
+                util_timer  *timer = users_timer[sockfd].timer;
+                deal_timer(timer, sockfd);           // 这里好像没将users[sockfd] 关闭啊， 就是调用users[sockfd].close_conn()    不用调用，在lst_timer的函数指针就做了，关闭sockfd
                 std::cout<<" 客户端关闭连接 "<<std::endl;
+            }
+            // 信号处理
+            else if( sockfd == m_pipefd[0] && (events[i].events & EPOLLIN)) {
+                bool flag = dealwithsignal(timeout, stop_server);
+
+
             }
             else if( events[i].events & EPOLLIN) {
                 // 处理来自客户端的数据
@@ -160,9 +191,73 @@ void WebServer::eventLoop() {
 //        std::cout<<"处理了"<<number<<"个事件"<<std::endl;
 
     }
+    if(timeout) {
+        utils.timer_handler();
+
+        timeout = false;
+    }
 
 
 }
+
+
+void WebServer::deal_timer(util_timer *timer, int sockfd) {
+    timer->cb_func(&users_timer[sockfd]);    // 将connfd从epoll中移除，关闭sockfd, http_conn::m_user_count--, 已经建立的客户连接减1
+    if(timer) {
+        utils.m_timer_lst.del_timer(timer);   // 将定时器从双链表中移除
+    }
+}
+
+bool WebServer::dealwithsignal(bool &timeout, bool &stop_server) {
+    int ret = 0;
+    int sig;
+    char signals[1024];
+    ret = recv(m_pipefd[0], signals, sizeof(signals), 0);
+    if(ret == -1) {
+        return false;
+    }
+    else if (ret == 0) {
+        return false;
+    }
+    else {
+        for (int i = 0; i < ret; ++i) {
+            switch (signals[i]) {
+                case SIGALRM: {
+                    timeout = true;
+                    break;
+                }
+                case SIGTERM: {
+                    stop_server = true;
+                    break;
+                }
+            }
+        }
+    }
+    return true;
+}
+
+void WebServer::timer(int connfd, struct sockaddr_in client_address) {
+
+    // 创建定时器 设置回调函数和超时时间，绑定用户数据，将定时器添加到链表中
+    users_timer[connfd].address = client_address;
+    users_timer[connfd].sockfd = connfd;
+    util_timer *timer = new util_timer;
+    timer->user_data = &users_timer[connfd];
+    timer->cb_func = cb_func;
+    time_t cur = time(NULL);
+    timer->expire = cur + 3 * TIMESLOT;
+    users_timer[connfd].timer = timer;
+    utils.m_timer_lst.add_timer(timer);
+
+}
+
+void WebServer::adjust_timer(util_timer *timer) {
+    time_t cur = time(NULL);
+    timer->expire = cur + 3 * TIMESLOT;
+    utils.m_timer_lst.adjust_timer(timer);
+
+}
+
 
 // 处理新进来的客户端连接   处理监听连接
 bool WebServer::dealclientdata() {
@@ -175,9 +270,13 @@ bool WebServer::dealclientdata() {
             return false;
         }
         if(http_conn::m_user_count >= MAX_FD) {   // 连接数量已满
+            utils.show_error(connfd, "Internal server busy");
             return false;
         }
         users[connfd].init(connfd, client_address, m_root, m_CONNTrigmode);
+        users[connfd].utils = utils;    // 这样好像不太好
+
+        timer(connfd, client_address);    // 定时器初始化一个结点
 
         // 提示输出有一个客户端连接加入了进来
         std::cout<<"有一个客户端连接加入了进来， 通信socketfd: "<<connfd<<std::endl;
@@ -193,13 +292,19 @@ bool WebServer::dealclientdata() {
 
 void WebServer::dealwithread(int sockfd) {
 
+    util_timer *timer = users_timer[sockfd].timer;
+
     if ( m_actormodel == 0) {      // Proactor   在主线程中读取数据
         if( users[sockfd].read_once() ) {
             // 检测到了读事件，并读取了数据
             m_pool->append(&users[sockfd]);
+            if(timer) {
+                adjust_timer(timer);
+            }
         }
         else {   // 对方断开连接或者出错，要把user中对应的对象销毁
-            users->close_conn(true);  // 关闭连接， 如果有定时器的话，应该也可以不管，到时间也会清除，看他的项目里在这就没有，只是清除了定时器，好像不行啊
+//            users->close_conn(true);  // 关闭连接， 如果有定时器的话，应该也可以不管，到时间也会清除，看他的项目里在这就没有，只是清除了定时器，好像不行啊
+            deal_timer(timer, sockfd);
         }
 
 
@@ -210,14 +315,20 @@ void WebServer::dealwithread(int sockfd) {
 
 }
 void WebServer::dealwithwrite(int sockfd) {
+    util_timer *timer = users_timer[sockfd].timer;
 
     if(m_trigmode == 0) {
         // Proactor
         if(users[sockfd].write()){
             printf("--- 发送一次\n");
+
+            if(timer){
+                adjust_timer(timer);
+            }
         }
         else{
-            users[sockfd].close_conn();
+//            users[sockfd].close_conn();
+            deal_timer(timer, sockfd);
         }
     }
     else {
