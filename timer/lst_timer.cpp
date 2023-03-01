@@ -127,7 +127,7 @@ void sort_timer_lst::tick() {     // 定时处理的函数       时间到了，
         if(cur < tmp->expire)  // 当前结点的终止时间已经过了，要把这个结点给删掉
             break;
 
-        tmp->cb_func(tmp->user_data);
+        tmp->cb_func(tmp->user_data);   // 将sockfd从epoll移除，并关闭sockfd文件描述符
         head = tmp->next;
         if(head) {
             head->prev = NULL;
@@ -192,11 +192,11 @@ void Utils::modfd(int epollfd, int fd, int ev, int TRIGMode) {
 }
 
 
-void Utils::sig_handler(int sig) {
+void Utils::sig_handler(int sig) {     // 回调函数      信号处理函数中仅仅通过管道发送信号值，不处理信号对应的逻辑，缩短异步执行时间，减少对主程序的影响。
     //为保证函数的可重入性，保留原来的errno, 这是原来主程序的errno,之后进行定时器处理，可能会改变这个errno,等处理结束后，再变回去
     //可重入性表示中断后再次进入该函数，环境变量与之前相同，不会丢失数据
     int save_errno = errno;
-    int msg = sig;
+    int msg = sig;      // 为啥呢？ sig本身就是int，参数也不是指针 引用的
     send(u_pipefd[1], (char *)&msg, 1, 0);      // 信号
     errno = save_errno;
 }

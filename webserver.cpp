@@ -133,9 +133,9 @@ void WebServer::eventListen() {    // 创建监听socket并监听  和创建epol
     utils.setnonblocking(m_pipefd[1]);     // 设置管道写端非阻塞
     utils.addfd(m_epollfd, m_pipefd[0], false, 0);  // 设置管道读端为ET非阻塞
 
-    utils.addsig(SIGPIPE, SIG_IGN);
-    utils.addsig(SIGALRM, utils.sig_handler, false);
-    utils.addsig(SIGTERM, utils.sig_handler, false);
+    utils.addsig(SIGPIPE, SIG_IGN);    // restart = true;
+    utils.addsig(SIGALRM, utils.sig_handler, false);   // 时间到了触发
+    utils.addsig(SIGTERM, utils.sig_handler, false);   // kill会触发 ctrl+c
 
     alarm(TIMESLOT);     // 为什么在这里就加了alarm, 现在还没有客户端连接呢
 
@@ -171,7 +171,7 @@ void WebServer::eventLoop() {
                 deal_timer(timer, sockfd);           // 这里好像没将users[sockfd] 关闭啊， 就是调用users[sockfd].close_conn()    不用调用，在lst_timer的函数指针就做了，关闭sockfd
                 std::cout<<sockfd<<" 客户端关闭连接 "<<std::endl;
             }
-            // 信号处理     这个信号将会每个每隔TIMESLOT触发一次， 若没有更新，会断开三次之前的那个链接
+            // 信号处理     这个信号将会每个每隔TIMESLOT触发一次， 若没有更新expire时间，会断开三次之前的那个链接
             else if( sockfd == m_pipefd[0] && (events[i].events & EPOLLIN)) {
                 printf("处理信号\n");
                 bool flag = dealwithsignal(timeout, stop_server);
@@ -193,9 +193,8 @@ void WebServer::eventLoop() {
 
 //        std::cout<<"处理了"<<number<<"个事件"<<std::endl;
 
-        if(timeout) {
+        if(timeout) {       // 这个连接收到了SIGALRM信号，时间过去了一个timeslot了
             utils.timer_handler();
-
             timeout = false;
         }
     }

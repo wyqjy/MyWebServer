@@ -26,7 +26,7 @@
 class util_timer;
 
 struct client_data {     // 这个和util_timer是你中有我，我中有你，为什么呢？ 难道是一种设计模式吗？
-    sockaddr_in address;
+    sockaddr_in address;        //address没用到 不能说这个变量没有用，因为我们可以找到客户端连接的ip地址，用它来做一些业务，比如通过ip来判断是否异地登录等等。
     int sockfd;
     util_timer *timer;    // 感觉这个没啥用啊， 在webserver的dealread和dealwrite中用到
 };
@@ -84,7 +84,7 @@ public:
     void modfd(int epollfd, int fd, int ev, int TRIGMode);
 
 
-    // 信号处理函数
+    // 信号处理函数   回调函数
     static void sig_handler(int sig);
 
     // 设置信号函数
