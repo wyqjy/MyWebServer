@@ -27,7 +27,7 @@
 
 const int MAX_FD = 65536;              // 最大的文件描述符，创建这么大的http_conn, 代表加入的连接，以connfd(连接的sockfd)作为相应的下标
 const int MAX_EVENT_NUMBER = 10000;   // 最大事件数
-const int TIMESLOT = 2;                 // 最小超时单位
+const int TIMESLOT = 5;                 // 最小超时单位
 
 class WebServer {
 public:

@@ -171,7 +171,7 @@ void WebServer::eventLoop() {
                 deal_timer(timer, sockfd);           // 这里好像没将users[sockfd] 关闭啊， 就是调用users[sockfd].close_conn()    不用调用，在lst_timer的函数指针就做了，关闭sockfd
                 std::cout<<sockfd<<" 客户端关闭连接 "<<std::endl;
             }
-            // 信号处理
+            // 信号处理     这个信号将会每个每隔TIMESLOT触发一次， 若没有更新，会断开三次之前的那个链接
             else if( sockfd == m_pipefd[0] && (events[i].events & EPOLLIN)) {
                 printf("处理信号\n");
                 bool flag = dealwithsignal(timeout, stop_server);
@@ -193,13 +193,12 @@ void WebServer::eventLoop() {
 
 //        std::cout<<"处理了"<<number<<"个事件"<<std::endl;
 
-    }
-    if(timeout) {
-        utils.timer_handler();
+        if(timeout) {
+            utils.timer_handler();
 
-        timeout = false;
+            timeout = false;
+        }
     }
-
 
 }
 

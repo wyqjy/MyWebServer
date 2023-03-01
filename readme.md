@@ -255,3 +255,9 @@ A： 这会不会是和浏览器有关，有的浏览器发送的请求报文就
     最后将lst_timer.h的放到了lst_timer.cpp中了  
     
     http_conn这里只是要用里面对epoll的操作，所以定义成static也没啥问题吧，utils里面的数据并不重要， 只要新定义一个utils就行，不用从webserver那边传过来
+
+---
+
+[-23.3.1]
+1. 时间到了没有去断开连接呢？
+    对timeout函数位置没有放进while里

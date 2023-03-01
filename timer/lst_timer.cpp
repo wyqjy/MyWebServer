@@ -197,7 +197,7 @@ void Utils::sig_handler(int sig) {
     //可重入性表示中断后再次进入该函数，环境变量与之前相同，不会丢失数据
     int save_errno = errno;
     int msg = sig;
-    send(u_pipefd[1], (char *)&msg, 1, 0);
+    send(u_pipefd[1], (char *)&msg, 1, 0);      // 信号
     errno = save_errno;
 }
 
