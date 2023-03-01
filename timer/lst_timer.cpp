@@ -3,6 +3,7 @@
 //
 
 #include "lst_timer.h"
+#include "../http/http_conn.h"
 
 
 
@@ -114,6 +115,8 @@ void sort_timer_lst::del_timer(util_timer *timer) {    // 从链表中删除这�
 }
 
 void sort_timer_lst::tick() {     // 定时处理的函数       时间到了，删除结点   但为什么不在这里调用del_timer呢
+
+    printf("时间到了，删除： \n");
     if(!head){
         return;
     }
@@ -129,6 +132,7 @@ void sort_timer_lst::tick() {     // 定时处理的函数       时间到了，
         if(head) {
             head->prev = NULL;
         }
+        printf("delete connfd: %d\n", tmp->user_data->sockfd);
         delete tmp;
         tmp = head;
     }

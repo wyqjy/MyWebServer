@@ -247,4 +247,11 @@ A： 这会不会是和浏览器有关，有的浏览器发送的请求报文就
 
 6.  在lst_timer.h中对client_data和util_timer是你中有我，我中有你，有这个必要吗？  还是说这是某种设计模式呢
     在lst_timer中的util_timer的指针在webserver中用到了，因为在webserver中存的是client_data 结点
-7. 我自己在http_conn中加入了一个static Utils, 后来将static去掉，变成普通的成员，之后将定义从listen转到loop
+  
+
+7. 我自己在http_conn中加入了一个static Utils, 后来将static去掉，变成普通的成员，之后将定义从listen转到loop了  
+    之后一直报错，Utils不知道什么类型？？  
+    最后发现应该是循环引用头文件了， 在http_conn.h中引用了lst_timer.h, 之后又在lst_timer.h中include "http_conn.h"    
+    最后将lst_timer.h的放到了lst_timer.cpp中了  
+    
+    http_conn这里只是要用里面对epoll的操作，所以定义成static也没啥问题吧，utils里面的数据并不重要， 只要新定义一个utils就行，不用从webserver那边传过来

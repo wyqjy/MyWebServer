@@ -169,12 +169,15 @@ void WebServer::eventLoop() {
                 // 客户端连接关闭，移除对应的定时器
                 util_timer  *timer = users_timer[sockfd].timer;
                 deal_timer(timer, sockfd);           // 这里好像没将users[sockfd] 关闭啊， 就是调用users[sockfd].close_conn()    不用调用，在lst_timer的函数指针就做了，关闭sockfd
-                std::cout<<" 客户端关闭连接 "<<std::endl;
+                std::cout<<sockfd<<" 客户端关闭连接 "<<std::endl;
             }
             // 信号处理
             else if( sockfd == m_pipefd[0] && (events[i].events & EPOLLIN)) {
+                printf("处理信号\n");
                 bool flag = dealwithsignal(timeout, stop_server);
-
+                if(flag==false){
+                    printf("信号处理出错\n");
+                }
 
             }
             else if( events[i].events & EPOLLIN) {
@@ -274,7 +277,7 @@ bool WebServer::dealclientdata() {
             return false;
         }
         users[connfd].init(connfd, client_address, m_root, m_CONNTrigmode);
-        users[connfd].utils = utils;    // 这样好像不太好
+//        users[connfd].utils = utils;    // 这样好像不太好
 
         timer(connfd, client_address);    // 定时器初始化一个结点
 
@@ -320,7 +323,7 @@ void WebServer::dealwithwrite(int sockfd) {
     if(m_trigmode == 0) {
         // Proactor
         if(users[sockfd].write()){
-            printf("--- 发送一次\n");
+//            printf("--- 发送一次\n");
 
             if(timer){
                 adjust_timer(timer);

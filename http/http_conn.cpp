@@ -36,6 +36,8 @@ void http_conn::init(int sockfd, const sockaddr_in &addr, char *root, int TRIGMo
     init();
 
 
+
+
 }
 
 void http_conn::init() {
