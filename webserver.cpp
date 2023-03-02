@@ -35,7 +35,7 @@ WebServer::~WebServer() {
     delete m_pool;
 }
 
-void WebServer::init(string user, string password, string databaseName, int sql_num, int close_log, int port, int thread_num,
+void WebServer::init(string user, string password, string databaseName, int sql_num, int close_log, int log_write, int port, int thread_num, int opt_linger,
                      int trigmode, int actor_model) {
 
     m_user = user;
@@ -50,6 +50,9 @@ void WebServer::init(string user, string password, string databaseName, int sql_
     m_actormodel = actor_model;
 
     m_close_log = close_log;
+    m_log_write = log_write;
+    m_OPT_LINGER = opt_linger;
+
 }
 
 void WebServer::trig_mode() {
@@ -78,6 +81,18 @@ void WebServer::trig_mode() {
             m_LISTENTrigmode = 0;
             m_CONNTrigmode = 0;
         }
+    }
+}
+
+void WebServer::log_write() {
+    if(m_close_log == 0) {  // 开启日志
+        if(m_log_write == 1){   // 异步
+            Log::get_instance()->init("../ServerLog", m_close_log, 2000, 800000, 800);
+        }
+        else{
+            Log::get_instance()->init("../ServerLog", m_close_log, 2000, 800000, 0);
+        }
+
     }
 }
 
@@ -152,9 +167,16 @@ void WebServer::eventLoop() {
     bool stop_server = false;
     bool timeout = false;  // 表示现在是否超时了   超时标志
 
+    LOG_INFO("Loop Begin");
     while(!stop_server) {
 
         int number = epoll_wait(m_epollfd, events, MAX_EVENT_NUMBER, -1);
+        if (number < 0 && errno != EINTR)
+        {
+            LOG_ERROR("%s", "epoll failure");
+            break;
+        }
+
 
         for(int i=0; i<number; i++) {
 
@@ -173,7 +195,7 @@ void WebServer::eventLoop() {
             }
             // 信号处理     这个信号将会每个每隔TIMESLOT触发一次， 若没有更新expire时间，会断开三次之前的那个链接
             else if( sockfd == m_pipefd[0] && (events[i].events & EPOLLIN)) {
-                printf("处理信号\n");
+//                printf("处理信号\n");
                 bool flag = dealwithsignal(timeout, stop_server);
                 if(flag==false){
                     printf("信号处理出错\n");
@@ -207,6 +229,8 @@ void WebServer::deal_timer(util_timer *timer, int sockfd) {
     if(timer) {
         utils.m_timer_lst.del_timer(timer);   // 将定时器从双链表中移除
     }
+
+    LOG_INFO("close fd %d", users_timer[sockfd].sockfd);
 }
 
 bool WebServer::dealwithsignal(bool &timeout, bool &stop_server) {

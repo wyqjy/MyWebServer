@@ -116,7 +116,7 @@ void sort_timer_lst::del_timer(util_timer *timer) {    // 从链表中删除这�
 
 void sort_timer_lst::tick() {     // 定时处理的函数       时间到了，删除结点   但为什么不在这里调用del_timer呢
 
-    printf("时间到了，删除： \n");
+//    printf("时间到了，删除： \n");
     if(!head){
         return;
     }
@@ -210,7 +210,7 @@ void Utils::addsig(int sig, void (*handler)(int), bool restart) {
     if( restart ){                  //使被信号打断的系统调用自动重新发起
         sa.sa_flags |= SA_RESTART;
     }
-    sigfillset(&sa.sa_mask);    // 将信号集中所有标志位都置为1，表示阻塞这个信号
+    sigfillset(&sa.sa_mask);    // 临时阻塞信号集，表示在处理handler函数的过程中，对所有的信号都屏蔽，等handler处理完后，再将信号集中的信号从屏蔽中移除
     assert(sigaction(sig, &sa, NULL) != -1);    // 注册捕捉函数sigaction
 
 }

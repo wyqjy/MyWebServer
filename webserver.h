@@ -24,6 +24,7 @@
 #include "./threadpool/threadpool.h"
 #include "./http/http_conn.h"
 #include "./timer/lst_timer.h"
+#include "./log/log.h"
 
 const int MAX_FD = 65536;              // 最大的文件描述符，创建这么大的http_conn, 代表加入的连接，以connfd(连接的sockfd)作为相应的下标
 const int MAX_EVENT_NUMBER = 10000;   // 最大事件数
@@ -34,8 +35,8 @@ public:
     WebServer();
     ~WebServer();
 
-    void init(string user, string password, string databaseName, int sql_num, int close_log, int port,
-              int thread_num, int trigmode=0, int actor_model=0);
+    void init(string user, string password, string databaseName, int sql_num, int close_log, int log_write, int port,
+              int thread_num, int opt_linger, int trigmode=0, int actor_model=0);
 
     void thread_pool();
     void trig_mode();
@@ -57,13 +58,16 @@ public:
     void deal_timer(util_timer *timer, int sockfd);
     bool dealwithsignal(bool& timeout, bool& stop_server);
 
+    // 日志
+    void log_write();
+
 
 private:
     int m_listenfd;     // 监听的文件描述符
     int m_port;         // 端口号
     int m_epollfd;      // epoll文件描述符
 
-
+    int m_OPT_LINGER;
 
     http_conn *users;   // 建立连接的客户端，用connfd作为下标可以找到对应的连接信息
 
@@ -93,6 +97,7 @@ private:
 
     // 日志相关
     int m_close_log;
+    int m_log_write;   // 日志的模式
 
     // 定时器相关， 也包括了向epoll中注册 新连接
 private:

@@ -434,20 +434,21 @@ http_conn::HTTP_CODE http_conn::do_request() {
 
         char *m_url_real = (char *)malloc(sizeof(char) * 200);
         strcpy(m_url_real, "/");
-        strcat(m_url_real, m_url + 2);
+        strcat(m_url_real, m_url + 2);   // 跳过数字， 而别的直接根据数字就判断了，这里还需要继续判断
         strncpy(m_real_file + len, m_url_real, FILENAME_LEN - len - 1);
         free(m_url_real);
 
-        //将用户名和密码提取出来
-        //user=123&passwd=123
+//        printf("m_real_file: %s\n %s\n", m_real_file, m_string);
+        // 将用户名和密码提取出来
+        //user=123&password=123
         char name[100], password[100];
         int i;
-        for (i = 5; m_string[i] != '&'; ++i)    // m_string 保存的是请求头的数据
+        for (i = 5; m_string[i] != '&'; ++i)    // m_string 保存的是请求头的数据  从5开始是因为users=
             name[i - 5] = m_string[i];
         name[i - 5] = '\0';
 
         int j = 0;
-        for (i = i + 10; m_string[i] != '\0'; ++i, ++j)
+        for (i = i + 10; m_string[i] != '\0'; ++i, ++j)  // 从10开始是 &password=
             password[j] = m_string[i];
         password[j] = '\0';
 

@@ -16,10 +16,15 @@ int main() {
     int actor_model = 0;
 
     int close_log = 0;
+    int log_write = 0;  // 同步日志
+
+    int opt_linger = 0;
 
     WebServer server;
 
-    server.init(user, password, databaseName, sql_num, close_log, port, thread_num, trigmode, actor_model);
+    server.init(user, password, databaseName, sql_num, close_log, log_write, port, thread_num,  opt_linger, trigmode, actor_model);
+
+    server.log_write();
 
     server.sql_pool();
 
