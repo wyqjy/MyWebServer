@@ -23,14 +23,14 @@ Log::~Log() {
 bool Log::init(const char *file_name, int close_log, int log_buf_size, int split_lines, int max_queue_size) {
 
     // max_queue_size 不为0，设置异步日志模式
-//    if (max_queue_size >= 1) {
-//        m_is_async = true;
-//        m_log_queue = new block_queue<string>(max_queue_size);    // 创建并设置阻塞队列长度
-//        pthread_t tid;
-//
-//        // flush_log_thread是回调函数，创建线程异步写日志
-//        int ret = pthread_create(&tid, NULL, flush_log_thread, NULL);
-//    }
+    if (max_queue_size >= 1) {
+        m_is_async = true;
+        m_log_queue = new block_queue<string>(max_queue_size);    // 创建并设置阻塞队列长度
+        pthread_t tid;
+
+        // flush_log_thread是回调函数，创建线程异步写日志
+        int ret = pthread_create(&tid, NULL, flush_log_thread, NULL);
+    }
 
     m_close_log = close_log;
     m_log_buf_size = log_buf_size;
@@ -155,10 +155,10 @@ void Log::write_log(int level, const char *format, ...) {
 
     //若m_is_async为true表示异步，默认为同步
     //若异步,则将日志信息加入阻塞队列,同步则加锁向文件中写
-//    if (m_is_async && !m_log_queue->full()) {
-//        m_log_queue->push(log_str);
-//    }
-//    else
+    if (m_is_async && !m_log_queue->full()) {
+        m_log_queue->push(log_str);
+    }
+    else
     {
         m_mutex.lock();
         fputs(log_str.c_str(), m_fp);

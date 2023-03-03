@@ -25,9 +25,9 @@ public:
     bool init(const char *file_name, int close_log, int log_buf_size = 8192, int split_lines = 5000000, int max_queue_size = 0);
 
     // 注意线程的回调函数必须是static
-//    static void* flush_log_thread(void *args){
-//        Log::get_instance() -> async_write_log();
-//    }
+    static void* flush_log_thread(void *args){
+        Log::get_instance() -> async_write_log();
+    }
 
     void write_log(int level, const char *format, ...);
 
@@ -38,10 +38,10 @@ private:
     Log();
     virtual ~Log();         // 为什么设置成虚函数，也不涉及继承多态啥的
 
-//    void *async_write_log() {
-//        string single_log;
-//        // 从阻塞队列中取出一个日志string, 写入文件
-//    }
+    void *async_write_log() {
+        string single_log;
+        // 从阻塞队列中取出一个日志string, 写入文件
+    }
 
 
 private:
@@ -56,7 +56,7 @@ private:
     block_queue<string> *m_log_queue; //阻塞队列
     bool m_is_async;                  //是否同步标志位
     locker m_mutex;
-    int m_close_log; //关闭日志    0打开1关闭
+    int m_close_log;                  //关闭日志    0打开1关闭
 
 
 };
