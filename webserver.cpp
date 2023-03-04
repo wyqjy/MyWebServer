@@ -114,6 +114,18 @@ void WebServer::eventListen() {    // 创建监听socket并监听  和创建epol
     m_listenfd = socket(PF_INET, SOCK_STREAM, 0);
     assert(m_listenfd >= 0);
 
+    //优雅关闭连接
+    if (0 == m_OPT_LINGER)
+    {
+        struct linger tmp = {0, 1};
+        setsockopt(m_listenfd, SOL_SOCKET, SO_LINGER, &tmp, sizeof(tmp));
+    }
+    else if (1 == m_OPT_LINGER)
+    {
+        struct linger tmp = {1, 1};
+        setsockopt(m_listenfd, SOL_SOCKET, SO_LINGER, &tmp, sizeof(tmp));
+    }
+
     // 设置server地址
     struct sockaddr_in address;
     bzero(&address, sizeof(address));
