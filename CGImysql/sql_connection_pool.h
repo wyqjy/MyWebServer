@@ -12,6 +12,7 @@
 #include <string>
 #include <cstring>
 #include "../lock/locker.h"
+#include "../log/log.h"
 
 #include <pthread.h>
 #include <cstdlib>

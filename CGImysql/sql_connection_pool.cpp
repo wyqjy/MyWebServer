@@ -29,10 +29,12 @@ void connection_pool::init(string url, string User, string Password, string Data
         MYSQL *con = NULL;
         con = mysql_init(con);
         if(con == NULL) {
+            LOG_ERROR("MySQL Error");
             exit(1);
         }
         con = mysql_real_connect(con, m_url.c_str(), m_User.c_str(), m_password.c_str(), m_DatabaseName.c_str(), m_Port, NULL, 0);
         if(con == NULL){
+            LOG_ERROR("MySQL Error");
             exit(1);
         }
         connList.push_back(con);

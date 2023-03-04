@@ -23,6 +23,7 @@
 #include <sys/uio.h>
 #include <map>
 
+#include "../log/log.h"
 #include "../lock/locker.h"
 #include "../timer/lst_timer.h"
 #include "../CGImysql/sql_connection_pool.h"
@@ -80,7 +81,7 @@ public:
     http_conn() {}
     ~http_conn() {}
 
-    void init(int sockfd, const sockaddr_in &addr, char *root, int TRIGMode);
+    void init(int sockfd, const sockaddr_in &addr, int close_log, char *root, int TRIGMode);
     void close_conn(bool real_close = true);
 
     void process();
@@ -159,6 +160,9 @@ public:    // 基本信息
 
     int m_sockfd;             // 和这个客户端连接的fd
     sockaddr_in m_address;    // 客户端的地址
+    sockaddr_in *get_address() {
+        return &m_address;
+    }
     int m_TRIGMode;           // 这个连接的触发模式
 
     char *doc_root;
@@ -168,6 +172,7 @@ public:    // 基本信息
 
     Utils utils;              // 包含定时器和 把socketfd加入到epoll中  这里主要用到在客户端连接进来的时候，要将connfd注册到epoll中
 
+    int m_close_log;
 
 private:
 

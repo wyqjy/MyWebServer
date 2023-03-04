@@ -210,6 +210,7 @@ void WebServer::eventLoop() {
 //                printf("处理信号\n");
                 bool flag = dealwithsignal(timeout, stop_server);
                 if(flag==false){
+                    LOG_ERROR("%s", "dealclientdata failure");
                     printf("信号处理出错\n");
                 }
 
@@ -229,6 +230,7 @@ void WebServer::eventLoop() {
 
         if(timeout) {       // 这个连接收到了SIGALRM信号，时间过去了一个timeslot了
             utils.timer_handler();
+            LOG_INFO("%s", "timer tick");
             timeout = false;
         }
     }
@@ -293,6 +295,8 @@ void WebServer::adjust_timer(util_timer *timer) {
     timer->expire = cur + 3 * TIMESLOT;
     utils.m_timer_lst.adjust_timer(timer);
 
+    LOG_INFO("%s", "adjust timer once");
+
 }
 
 
@@ -304,13 +308,15 @@ bool WebServer::dealclientdata() {
     if (m_LISTENTrigmode == 0 ) {  // 水平触发
         int connfd = accept(m_listenfd, (struct sockaddr *)&client_address, &client_addrlength);
         if(connfd < 0) {
+            LOG_ERROR("%s:errno is:%d", "accept error", errno);
             return false;
         }
         if(http_conn::m_user_count >= MAX_FD) {   // 连接数量已满
+            LOG_ERROR("%s", "Internal server busy");
             utils.show_error(connfd, "Internal server busy");
             return false;
         }
-        users[connfd].init(connfd, client_address, m_root, m_CONNTrigmode);
+        users[connfd].init(connfd, client_address, m_close_log, m_root, m_CONNTrigmode);
 //        users[connfd].utils = utils;    // 这样好像不太好
 
         timer(connfd, client_address);    // 定时器初始化一个结点
@@ -319,10 +325,23 @@ bool WebServer::dealclientdata() {
         std::cout<<"有一个客户端连接加入了进来， 通信socketfd: "<<connfd<<std::endl;
 
     }
-    else{   // 监听的边缘触发，暂时不管
-        std::cout<<"Warning: 监听的边缘触发暂未实现"<<std::endl;
-        exit(-1);
+    else{   // 监听的边缘触发    没啥用的这个
 
+        while(1) {
+            int connfd = accept(m_listenfd, (struct sockaddr *)&client_address, &client_addrlength);
+            if(connfd < 0) {
+                LOG_ERROR("%s:errno is:%d", "accept error", errno);
+                break;
+            }
+            if (http_conn::m_user_count >= MAX_FD)
+            {
+                utils.show_error(connfd, "Internal server busy");
+                LOG_ERROR("%s", "Internal server busy");
+                break;
+            }
+            timer(connfd, client_address);
+        }
+        return false;    // 最后为啥返回false,是因为结束的时候一定是出错的时候吗？  并且最后若不断的有新连接进来，while不停，别的连接的请求也无法被处理， 他根本就没把连接加入users,就只管建立连接，其他都不管
     }
     return true;
 }
@@ -333,6 +352,7 @@ void WebServer::dealwithread(int sockfd) {
 
     if ( m_actormodel == 0) {      // Proactor   在主线程中读取数据
         if( users[sockfd].read_once() ) {
+            LOG_INFO("deal with the client(%s)", inet_ntoa(users[sockfd].get_address()->sin_addr));
             // 检测到了读事件，并读取了数据
             m_pool->append(&users[sockfd]);
             if(timer) {
@@ -358,6 +378,7 @@ void WebServer::dealwithwrite(int sockfd) {
         // Proactor
         if(users[sockfd].write()){
 //            printf("--- 发送一次\n");
+            LOG_INFO("send data to the client(%s)", inet_ntoa(users[sockfd].get_address()->sin_addr));
 
             if(timer){
                 adjust_timer(timer);

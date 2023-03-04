@@ -22,13 +22,13 @@ int http_conn::m_user_count = 0;
 locker m_lock;
 map<string, string> users;
 
-void http_conn::init(int sockfd, const sockaddr_in &addr, char *root, int TRIGMode) {
+void http_conn::init(int sockfd, const sockaddr_in &addr, int close_log, char *root, int TRIGMode) {
     m_sockfd = sockfd;
     m_address = addr;
     m_TRIGMode = TRIGMode;
 
     doc_root = root;
-
+    m_close_log = close_log;
 
     utils.addfd(m_epollfd, m_sockfd, true, m_TRIGMode);
     m_user_count++;
@@ -75,8 +75,10 @@ void http_conn::initmysql_result(connection_pool *connPool) {
     connectionRAII mysqlcon(&mysql, connPool);
 
     // 将user表中将用户名和密码拿出来
-    if(mysql_query(mysql, "SELECT name, passwd FROM user")){
-        printf("出错\n");
+    if(mysql_query(mysql, "SELECT name, passwd FROM user")) {
+
+        LOG_ERROR("SELECT error:%s\n", mysql_error(mysql));
+        printf("数据库查询出错\n");
     }
 
     // 从表中检索出的完整结果集
@@ -240,6 +242,7 @@ http_conn::HTTP_CODE http_conn::process_read() {
         text = get_line();              // 获取一行的数据
         m_start_line = m_checked_idx;   // 新的下一行的起始位置
 
+        LOG_INFO("%s", text);
         switch(m_check_state) {
             case CHECK_STATE_REQUESTLINE: {
                 ret = parse_request_line(text);
@@ -401,7 +404,8 @@ http_conn::HTTP_CODE http_conn::parse_headers(char *text) {
         m_host = text;
     }
     else{       // 对于其他信息，先跳过，不加以解析
-        printf("oop! unknow header: %s\n", text);
+        LOG_INFO("oop!unknow header: %s", text);
+//        printf("oop! unknow header: %s\n", text);
     }
     return NO_REQUEST;
 }
@@ -626,6 +630,8 @@ bool http_conn::add_response(const char *format, ...) {
     }
     m_write_idx += len;
     va_end(arg_list);   // 清空可变参数列表
+
+    LOG_INFO("request:%s", m_write_buf);
 
     return true;
 }
