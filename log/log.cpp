@@ -160,7 +160,7 @@ void Log::write_log(int level, const char *format, ...) {
     }
     else
     {
-        m_mutex.lock();
+        m_mutex.lock();         // 同步写日志需要加锁吗
         fputs(log_str.c_str(), m_fp);
         m_mutex.unlock();
     }

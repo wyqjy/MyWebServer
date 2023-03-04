@@ -41,6 +41,13 @@ private:
     void *async_write_log() {
         string single_log;
         // 从阻塞队列中取出一个日志string, 写入文件
+        while( m_log_queue->pop(single_log) ) {
+            printf("异步写日志，拿到一条信息：");
+            cout<<single_log<<endl;
+            m_mutex.lock();                 // 在这加锁有必要吗？   不对，这个不是阻塞队列的锁， 是写数据的锁，防止多条写进来对同一个文件指针操作，写在同一个地方（其实这个不会发生，因为异步里面只有一个子线程）
+            fputs(single_log.c_str(), m_fp);
+            m_mutex.unlock();
+        }
     }
 
 
