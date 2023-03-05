@@ -46,12 +46,11 @@ private:
         while( m_log_queue->pop(single_log) ) {
 //            printf("异步写日志，拿到一条信息：");
 //            cout<<single_log<<endl;
-//            sleep(1);
             m_mutex.lock();                 // 在这加锁有必要吗？   不对，这个不是阻塞队列的锁， 是写数据的锁，防止多条写进来对同一个文件指针操作，写在同一个地方（其实这个不会发生，因为异步里面只有一个子线程）
             fputs(single_log.c_str(), m_fp);    // Log::get_instance()->
             m_mutex.unlock();
 
-//            flush();    // 这里是类内普通成员函数，所以可以直接使用m_fp和flush()， 不用获取单例
+            flush();    // 这里是类内普通成员函数，所以可以直接使用m_fp和flush()， 不用获取单例
         }
     }
 
@@ -74,7 +73,7 @@ private:
 };
 
 #define LOG_DEBUG(format, ...) if(0 == m_close_log) {Log::get_instance()->write_log(0, format, ##__VA_ARGS__); Log::get_instance()->flush();}
-#define LOG_INFO(format, ...) if(0 == m_close_log) {Log::get_instance()->write_log(1, format, ##__VA_ARGS__); sleep(1); Log::get_instance()->flush();}
+#define LOG_INFO(format, ...) if(0 == m_close_log) {Log::get_instance()->write_log(1, format, ##__VA_ARGS__);  Log::get_instance()->flush();}
 #define LOG_WARN(format, ...) if(0 == m_close_log) {Log::get_instance()->write_log(2, format, ##__VA_ARGS__); Log::get_instance()->flush();}
 #define LOG_ERROR(format, ...) if(0 == m_close_log) {Log::get_instance()->write_log(3, format, ##__VA_ARGS__); Log::get_instance()->flush();}
 
