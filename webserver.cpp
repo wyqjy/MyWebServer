@@ -230,8 +230,8 @@ void WebServer::eventLoop() {
 
         if(timeout) {       // 这个连接收到了SIGALRM信号，时间过去了一个timeslot了
             utils.timer_handler();
-            LOG_INFO("%s", "timer tick");
-            cout<<"timer tick"<<endl;
+//            LOG_INFO("%s", "timer tick");
+//            cout<<"timer tick"<<endl;
             timeout = false;
         }
     }

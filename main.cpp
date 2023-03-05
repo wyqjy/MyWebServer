@@ -16,7 +16,7 @@ int main() {
     int actor_model = 0;
 
     int close_log = 0;
-    int log_write = 0;  // 同步日志
+    int log_write = 1;  // 同步日志
 
     int opt_linger = 0;
 
