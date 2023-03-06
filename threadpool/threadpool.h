@@ -18,7 +18,7 @@ class threadpool {
 public:
     threadpool(int actor_model, connection_pool *connPool, int thread_number=8, int max_requests=10000);
     ~threadpool();
-    bool append(T* request);
+    bool append(T* request, int state);
 
 
 private:
@@ -73,7 +73,7 @@ threadpool<T>::~threadpool() {
 }
 
 template<typename T>
-bool threadpool<T>::append(T *request) {
+bool threadpool<T>::append(T *request, int state) {
 
     m_queuelocker.lock();
     if(m_workqueue.size() >= m_max_request){
@@ -81,6 +81,7 @@ bool threadpool<T>::append(T *request) {
         return false;
     }
 
+    request->m_state = state;
     m_workqueue.push_back(request);
     m_queuestat.post();
     m_queuelocker.unlock();
@@ -112,16 +113,32 @@ void threadpool<T>::run() {
 
         if( m_actor_model == 1){     // Reactor
 
-            printf("Reactor模式，暂时没有实现\n");
-            return ;
+            if(request->m_state == 0){
+                if(request->read_once()) {
+                    request->improv = 1;
+                    connectionRAII mysqlcon(&request->mysql, m_connPool);
+                    request->process();
+                }
+                else{       // 读数据出错了
+                    request->improv = 1;
+                    request->timer_flag = 1;
+                }
+            }
+            else {
+                if(request->write()) {
+                    request->improv = 1;
+                }
+                else {
+                    request->improv = 1;
+                    request->timer_flag = 1;
+                }
+            }
 
-            request->process();   // 未完
         }
         else {                       // Proactor  主线程来处理读写  以同步的方式模拟异步
             connectionRAII mysqlcon(&request->mysql, m_connPool);
             request->process();
         }
-
 
     }
 }

@@ -172,7 +172,12 @@ public:    // 基本信息
 
     Utils utils;              // 包含定时器和 把socketfd加入到epoll中  这里主要用到在客户端连接进来的时候，要将connfd注册到epoll中
 
-    int m_close_log;
+    int m_close_log;        // 日志是否开启，在宏中使用的
+
+    // Reactor相关
+    int m_state;    // 判断现在要读还是要写
+    int improv;     // 一个处理是否完成，好通知主线程
+    int timer_flag; // 好像是出错后，结束连接，并删掉对应的定时器
 
 private:
 

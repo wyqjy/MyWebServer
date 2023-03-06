@@ -355,7 +355,7 @@ void WebServer::dealwithread(int sockfd) {
         if( users[sockfd].read_once() ) {
             LOG_INFO("deal with the client(%s)", inet_ntoa(users[sockfd].get_address()->sin_addr));
             // 检测到了读事件，并读取了数据
-            m_pool->append(&users[sockfd]);
+            m_pool->append(&users[sockfd], 0);
             if(timer) {
                 adjust_timer(timer);
             }
@@ -368,7 +368,22 @@ void WebServer::dealwithread(int sockfd) {
 
     }
     else {                      // Reactor 让子进程读写数据，在线程池的工作函数中需要加以判断
+        if(timer) {
+            adjust_timer(timer);
+        }
 
+        m_pool->append(users+sockfd, 0);
+
+        while(true) {   // 等待子线程处理完， improv其实算是一个信号（广义上的），告诉这边我处理完了，之后主线程才能工作，那这样对于主线程不就相当于阻塞的了
+            if(users[sockfd].improv == 1) {
+                if(users[sockfd].timer_flag == 1) {
+                    deal_timer(timer, sockfd);
+                    users[sockfd].timer_flag = 0;
+                }
+                users[sockfd].improv = 0;
+                break;
+            }
+        }
     }
 
 }
@@ -391,6 +406,23 @@ void WebServer::dealwithwrite(int sockfd) {
         }
     }
     else {
+
+        if(timer) {
+            adjust_timer(timer);
+        }
+
+        m_pool->append(users+sockfd, 1);
+
+        while(true) {
+            if(users[sockfd].improv == 1) {
+                if(users[sockfd].timer_flag == 1) {
+                    deal_timer(timer, sockfd);
+                    users[sockfd].timer_flag = 0;
+                }
+                users[sockfd].improv = 0;
+                break;
+            }
+        }
 
     }
 }
