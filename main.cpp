@@ -15,7 +15,7 @@ int main() {
     int trigmode = 0;
     int actor_model = 1;   // 模式  0是Proactor    1是Reactor
 
-    int close_log = 0;
+    int close_log = 0;  // 0开启日志 1关闭日志
     int log_write = 1;  // 同步日志
 
     int opt_linger = 0;
