@@ -21,6 +21,8 @@
 #include <fcntl.h>
 #include <cassert>
 
+#include <memory>
+
 #include "./threadpool/threadpool.h"
 #include "./http/http_conn.h"
 #include "./timer/lst_timer.h"
@@ -28,7 +30,7 @@
 
 const int MAX_FD = 65536;              // 最大的文件描述符，创建这么大的http_conn, 代表加入的连接，以connfd(连接的sockfd)作为相应的下标
 const int MAX_EVENT_NUMBER = 10000;   // 最大事件数
-const int TIMESLOT = 5;                 // 最小超时单位
+const int TIMESLOT = 1;                 // 最小超时单位
 
 class WebServer {
 public:
@@ -53,13 +55,15 @@ public:
 
 
     // 定时器相关
-    void timer(int connfd, struct sockaddr_in client_address);
-    void adjust_timer(util_timer *timer);
-    void deal_timer(util_timer *timer, int sockfd);
+    void timer(int connfd);  // 添加定时器结点
+    void adjust_timer(int connfd);
+    void deal_timer(int sockfd);
     bool dealwithsignal(bool& timeout, bool& stop_server);
 
     // 日志
     void log_write();
+
+
 
 
 private:
@@ -101,13 +105,16 @@ private:
 
     // 定时器相关， 也包括了向epoll中注册 新连接
 private:
-    client_data *users_timer;    // 这是一个连接的信息，不是结点啊，没有前后指针，还没有链表的对象sort_timer_lst, 链表对象在utils里面
     Utils utils;
+    std::unique_ptr<HeapTimer> timer_;
+    int timeoutMS_;   // 毫秒ms
+
 public:
     int m_pipefd[2];
 
-};
+    void close_conn(http_conn* client);
 
+};
 
 
 

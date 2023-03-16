@@ -6,145 +6,12 @@
 #include "../http/http_conn.h"
 
 
-
-sort_timer_lst::sort_timer_lst() {
-    head = NULL;
-    tail = NULL;
-}
-sort_timer_lst::~sort_timer_lst() {
-    util_timer *tmp = head;
-    while(tmp) {
-        head = tmp->next;
-        delete tmp;
-        tmp = head;
-    }
-}
-
-
-// 将定时器结点插入到 lst_head之后合适的位置  timer是升序的
-void sort_timer_lst::add_timer(util_timer *timer, util_timer *lst_head) {
-
-    util_timer *prev = lst_head;
-    util_timer *tmp = prev->next;
-
-    while(tmp) {
-        if(timer->expire < tmp->expire) {
-            timer->prev = prev;
-            prev->next = timer;
-            timer->next = tmp;
-            tmp->prev = timer;
-            break;
-        }
-        prev = tmp;
-        tmp = tmp -> next;
-    }
-
-    if(!tmp) {     // 插入到最后
-        prev->next = timer;
-        timer->prev = prev;
-        timer->next = NULL;
-        tail = timer;
-    }
-}
-
-void sort_timer_lst::add_timer(util_timer *timer) {    //更新了一个结点的时间戳,把这个结点的位置转到合适的位置，由于链表是升序的，更新时间戳一定是时间更大了，所以就往后找就行
-    if(!timer){
-        return;
-    }
-    if(!head){
-        head = timer;
-        tail = timer;
-    }
-    if(timer->expire < head->expire) {
-        timer->next = head;
-        head->prev = timer;
-        head = timer;
-        return ;
-    }
-    add_timer(timer, head);
-}
-
-void sort_timer_lst::adjust_timer(util_timer *timer) {
-    if(!timer){
-        return;
-    }
-    util_timer *tmp = timer->next;
-    if(!tmp || (timer->expire < tmp->expire)) {   // 已经就是合适的位置了
-        return ;
-    }
-    if (timer == head) {    // 把timer结点摘出来，之后放到合适的位置
-        head = head->next;
-        head->prev = NULL;
-        timer->next = NULL;
-        add_timer(timer, head);
-    }
-    else {
-        timer->next->prev = timer->prev;
-        timer->prev->next = timer->next;
-        add_timer(timer, timer->next);
-    }
-}
-
-void sort_timer_lst::del_timer(util_timer *timer) {    // 从链表中删除这个定时器结点
-    if(!timer){
-        return ;
-    }
-
-    if (timer == head && timer == tail) {
-        delete timer;
-        head = NULL;
-        tail = NULL;
-        return ;
-    }
-
-    if(timer == head){
-        head = head->next;
-        head->prev = NULL;
-        delete timer;
-        return;
-    }
-    if(timer == tail) {
-        tail = tail->prev;
-        tail->next = NULL;
-        delete timer;
-        return;
-    }
-    timer->prev->next = timer->next;
-    timer->next->prev = timer->prev;
-    delete timer;
-}
-
-void sort_timer_lst::tick() {     // 定时处理的函数       时间到了，删除结点   但为什么不在这里调用del_timer呢
-
-//    printf("时间到了，删除： \n");
-    if(!head){
-        return;
-    }
-
-    time_t cur = time(NULL);
-    util_timer *tmp = head;
-    while(tmp) {
-        if(cur < tmp->expire)  // 当前结点的终止时间已经过了，要把这个结点给删掉
-            break;
-
-        tmp->cb_func(tmp->user_data);   // 将sockfd从epoll移除，并关闭sockfd文件描述符
-        head = tmp->next;
-        if(head) {
-            head->prev = NULL;
-        }
-        printf("delete connfd: %d\n", tmp->user_data->sockfd);
-        delete tmp;
-        tmp = head;
-    }
-}
-
-
-
+//
 void Utils::init(int timeslot) {
     m_TIMESLOT = timeslot;
 }
-
-// 将文件描述符设置为非阻塞，返回原先的文件描述符的属性
+//
+//// 将文件描述符设置为非阻塞，返回原先的文件描述符的属性
 int Utils::setnonblocking(int fd) {
     int old_option = fcntl(fd, F_GETFL);
     int new_option = old_option | O_NONBLOCK;
@@ -178,7 +45,7 @@ void Utils::removefd(int epollfd, int fd) {
     close(fd);
 }
 
-// 将事件重置为EPOLLONESHOT
+//// 将事件重置为EPOLLONESHOT
 void Utils::modfd(int epollfd, int fd, int ev, int TRIGMode) {
     epoll_event event;
     event.data.fd = fd;
@@ -201,7 +68,7 @@ void Utils::sig_handler(int sig) {     // 回调函数      信号处理函数�
     errno = save_errno;
 }
 
-// 设置信号函数
+//// 设置信号函数
 void Utils::addsig(int sig, void (*handler)(int), bool restart) {
 
     struct sigaction sa;
@@ -219,7 +86,7 @@ void Utils::addsig(int sig, void (*handler)(int), bool restart) {
 //定时处理任务，重新定时以不断触发SIGALRM信号
 void Utils::timer_handler()
 {
-    m_timer_lst.tick();
+//    m_timer_lst.tick();
     alarm(m_TIMESLOT);          // 重新设置alarm， 为什么不用setitimer
 }
 
@@ -231,14 +98,146 @@ void Utils::show_error(int connfd, const char *info) {
 int* Utils::u_pipefd = 0;
 int Utils::u_epollfd = 0;
 
+////class Utils;
+//void cb_func(client_data *user_data) {
+//    epoll_ctl(Utils::u_epollfd, EPOLL_CTL_DEL, user_data->sockfd, 0);
+//    assert(user_data);
+//    close(user_data->sockfd);
+//    http_conn::m_user_count--;
+//}
 
 
 
+// 对于结点i，向上调整到合适的位置
+void HeapTimer::siftup_(size_t i) {   // 调整堆, 对i找到合适的位置，向上调整（新来的结点最开始在队尾）
+    assert(i >= 0 && i<heap_.size());
+    size_t j = (i-1)/2;     // 因为是下标所以需要先减去一个 1
+    while(j >= 0) {
+        if(heap_[j]<heap_[i]) break;
+        SwapNode_(i, j);
+        i = j;
+        j = (i-1) / 2;
+    }
+}
 
-//class Utils;
-void cb_func(client_data *user_data) {
-    epoll_ctl(Utils::u_epollfd, EPOLL_CTL_DEL, user_data->sockfd, 0);
-    assert(user_data);
-    close(user_data->sockfd);
-    http_conn::m_user_count--;
+void HeapTimer::SwapNode_(size_t i, size_t j) {
+    assert(i >= 0 && i < heap_.size());
+    assert(j >= 0 && j < heap_.size());
+    std::swap(heap_[i], heap_[j]);
+    ref_[heap_[i].id] = i;          // 重新确定位置下标  现在下标i里存放的是原来j的内容
+    ref_[heap_[j].id] = j;
+}
+
+bool HeapTimer::siftdown_(size_t index, size_t n) {
+    assert(index >= 0 && index < heap_.size());
+    assert(n >= 0 && n <= heap_.size());
+    size_t i = index;
+    size_t j = i * 2 + 1;
+    while(j < n) {
+        if(j + 1 < n && heap_[j + 1] < heap_[j]) j++;  // 是要左右结点选更小的那个
+        if(heap_[i] < heap_[j]) break;
+        SwapNode_(i, j);
+        i = j;
+        j = i * 2 + 1;
+    }
+    return i > index;
+}
+
+void HeapTimer::add(int id, int timeOut, const TimeoutCallBack &cb) {
+    assert(id >= 0);
+    size_t i;
+    if(ref_.count(id) == 0) {
+        /* 之前没有这个结点，是个新结点，插入到队尾，调整堆 */
+        i = heap_.size();
+        ref_[id] = i;
+        heap_.push_back({id, Clock::now() + MS(timeOut), cb});
+        siftup_(i);
+    }
+    else {
+        // 已经有这个结点了，更新时间，重新调整堆
+        i = ref_[id];
+        heap_[i].expires = Clock::now() + MS(timeOut);
+        heap_[i].cb = cb;
+        if(!siftdown_(i, heap_.size())) {  // 更新时间戳，时间变大，就需要向下调整
+            siftup_(i);             //若没有向下调整，为什么需要再向上判断呢？ 若不向下则有可能向上，若向下了，则确定了位置了，不用再管
+        }
+    }
+
+}
+
+void HeapTimer::doWork(int id) {
+    // 删除指定id结点，并触发回调函数
+    if (heap_.empty() || ref_.count(id) == 0) {  // 堆为空或者没有这个结点
+        return;
+    }
+    size_t i = ref_[id];
+    TimerNode node = heap_[i];
+    node.cb();
+    del_(i);
+}
+
+void HeapTimer::del_(size_t index) {
+    // 删除index下标的结点，在ref_里面存放的其实就是id对应的下标
+    assert(!heap_.empty() && index>=0 &&index<heap_.size());
+
+    // 将要删除的结点换到队尾，然后调整堆
+    size_t i = index;
+    size_t n = heap_.size()-1;  // 最后一个结点
+    assert(i <= n);
+    if(i < n) {
+        SwapNode_(i, n);
+        if(!siftdown_(i, n)) {  // 调整交换之后的，此时的i位置是原先的最后一个结点
+            siftup_(i);
+        }
+    }
+    // 队尾元素删除
+    ref_.erase(heap_.back().id);
+    heap_.pop_back();
+}
+
+
+void HeapTimer::adjust(int id, int timeout) {
+    // 调整指定id的结点
+    assert(!heap_.empty() && ref_.count(id)>0);
+    heap_[ref_[id]].expires = Clock::now() + MS(timeout);
+    siftdown_(ref_[id], heap_.size());
+
+}
+
+void HeapTimer::tick() {
+    // 清除超时结点
+    if( heap_.empty() ){
+        return ;
+    }
+    while(!heap_.empty()) {
+        TimerNode node = heap_.front();
+        if(std::chrono::duration_cast<MS>(node.expires - Clock::now()).count() > 0) {   // 为什么要这么比较呢？用计数，直接判断相减的值不行吗
+            break;
+        }
+        cout<<node.id<<" 到时间终止了"<<endl;
+        node.cb();
+        pop();
+    }
+}
+
+void HeapTimer::pop() {    // 小根堆的第一个元素出去
+    assert(!heap_.empty());
+    del_(0);
+}
+
+void HeapTimer::clear() {
+    ref_.clear();
+    heap_.clear();
+}
+
+int HeapTimer::GetNextTick() {    //返回的是还有多长时间到达最小结点的终止时间
+    tick();    // 清除超时结点
+    size_t res = -1;
+    if(!heap_.empty()) {   //判断下一个结点是否还是超时的
+        res = std::chrono::duration_cast<MS>(heap_.front().expires - Clock::now()).count();
+        if (res < 0) {
+            res = 0;
+        }
+    }
+    return res;
 }

@@ -4,7 +4,7 @@
 
 #include "webserver.h"
 
-WebServer::WebServer() {
+WebServer::WebServer() : timer_(new HeapTimer()){
 
     // 创建http_conn对象 每个对象以连接的fd作为下标，保存对应信息
     users = new http_conn[MAX_FD];
@@ -20,7 +20,8 @@ WebServer::WebServer() {
     m_root = "../root";
 
     // 定时器
-    users_timer = new client_data[MAX_FD];
+    timeoutMS_ = 60000;
+//    users_timer = new client_data[MAX_FD];
 }
 
 WebServer::~WebServer() {
@@ -31,8 +32,14 @@ WebServer::~WebServer() {
     close(m_pipefd[1]);
 
     delete [] users;
-    delete [] users_timer;
+//    delete [] users_timer;
     delete m_pool;
+}
+
+void WebServer::close_conn(http_conn *client) {
+    assert(client);
+    client->close_conn();
+    close(client->m_sockfd);
 }
 
 void WebServer::init(string user, string password, string databaseName, int sql_num, int close_log, int log_write, int port, int thread_num, int opt_linger,
@@ -201,8 +208,9 @@ void WebServer::eventLoop() {
             }
             else if ( events[i].events & (EPOLLRDHUP | EPOLLHUP | EPOLLERR) ) {
                 // 客户端连接关闭，移除对应的定时器
-                util_timer  *timer = users_timer[sockfd].timer;
-                deal_timer(timer, sockfd);           // 这里好像没将users[sockfd] 关闭啊， 就是调用users[sockfd].close_conn()    不用调用，在lst_timer的函数指针就做了，关闭sockfd
+                // util_timer  *timer = users_timer[sockfd].timer;
+                // deal_timer(timer, sockfd);           // 这里好像没将users[sockfd] 关闭啊， 就是调用users[sockfd].close_conn()    不用调用，在lst_timer的函数指针就做了，关闭sockfd
+                close_conn(&users[sockfd]);   //没有对小根堆的结点做删除处理，应该不用管
                 std::cout<<sockfd<<" 客户端关闭连接 "<<std::endl;
             }
             // 信号处理     这个信号将会每个每隔TIMESLOT触发一次， 若没有更新expire时间，会断开三次之前的那个链接
@@ -229,7 +237,8 @@ void WebServer::eventLoop() {
 //        std::cout<<"处理了"<<number<<"个事件"<<std::endl;
 
         if(timeout) {       // 这个连接收到了SIGALRM信号，时间过去了一个timeslot了
-            utils.timer_handler();
+            utils.timer_handler();  // 重置定时器
+            int timeMS = timer_->GetNextTick();  //
             LOG_INFO("%s", "timer tick");
 //            cout<<"timer tick"<<endl;
             timeout = false;
@@ -239,13 +248,14 @@ void WebServer::eventLoop() {
 }
 
 
-void WebServer::deal_timer(util_timer *timer, int sockfd) {
-    timer->cb_func(&users_timer[sockfd]);    // 将connfd从epoll中移除，关闭sockfd, http_conn::m_user_count--, 已经建立的客户连接减1
-    if(timer) {
-        utils.m_timer_lst.del_timer(timer);   // 将定时器从双链表中移除
-    }
+void WebServer::deal_timer(int sockfd) {
+//    timer->cb_func(&users_timer[sockfd]);    // 将connfd从epoll中移除，关闭sockfd, http_conn::m_user_count--, 已经建立的客户连接减1
+//    if(timer) {
+//        utils.m_timer_lst.del_timer(timer);   // 将定时器从双链表中移除
+//    }
+    close_conn(&users[sockfd]);
 
-    LOG_INFO("close fd %d", users_timer[sockfd].sockfd);
+    LOG_INFO("close fd %d", sockfd);
 }
 
 bool WebServer::dealwithsignal(bool &timeout, bool &stop_server) {
@@ -276,26 +286,28 @@ bool WebServer::dealwithsignal(bool &timeout, bool &stop_server) {
     return true;
 }
 
-void WebServer::timer(int connfd, struct sockaddr_in client_address) {
+void WebServer::timer(int connfd) {
 
     // 创建定时器 设置回调函数和超时时间，绑定用户数据，将定时器添加到链表中
-    users_timer[connfd].address = client_address;
-    users_timer[connfd].sockfd = connfd;
-    util_timer *timer = new util_timer;
-    timer->user_data = &users_timer[connfd];
-    timer->cb_func = cb_func;
-    time_t cur = time(NULL);
-    timer->expire = cur + 3 * TIMESLOT;
-    users_timer[connfd].timer = timer;
-    utils.m_timer_lst.add_timer(timer);
-
+//    users_timer[connfd].address = client_address;
+//    users_timer[connfd].sockfd = connfd;
+//    util_timer *timer = new util_timer;
+//    timer->user_data = &users_timer[connfd];
+//    timer->cb_func = cb_func;
+//    time_t cur = time(NULL);
+//    timer->expire = cur + 3 * TIMESLOT;
+//    users_timer[connfd].timer = timer;
+//    utils.m_timer_lst.add_timer(timer);
+    timer_->add(connfd, timeoutMS_,std::bind(&WebServer::close_conn, this, users+connfd));
+//    cout<<"将"<<connfd<<" 加入到了定时器堆中"<<endl;
 }
 
-void WebServer::adjust_timer(util_timer *timer) {
-    time_t cur = time(NULL);
-    timer->expire = cur + 3 * TIMESLOT;
-    utils.m_timer_lst.adjust_timer(timer);
-
+void WebServer::adjust_timer(int connfd) {
+//    time_t cur = time(NULL);
+//    timer->expire = cur + 3 * TIMESLOT;
+//    utils.m_timer_lst.adjust_timer(timer);
+    if(timeoutMS_ > 0)
+        timer_->adjust(connfd, timeoutMS_);
     LOG_INFO("%s", "adjust timer once");
 
 }
@@ -320,7 +332,7 @@ bool WebServer::dealclientdata() {
         users[connfd].init(connfd, client_address, m_close_log, m_root, m_CONNTrigmode);
 //        users[connfd].utils = utils;    // 这样好像不太好
 
-        timer(connfd, client_address);    // 定时器初始化一个结点
+        timer(connfd);    // 定时器初始化添加一个结点， 定时器中不需要地址信息
 
         // 提示输出有一个客户端连接加入了进来
         std::cout<<"有一个客户端连接加入了进来， 通信socketfd: "<<connfd<<std::endl;
@@ -340,7 +352,7 @@ bool WebServer::dealclientdata() {
                 LOG_ERROR("%s", "Internal server busy");
                 break;
             }
-            timer(connfd, client_address);
+            timer(connfd);
         }
         return false;    // 最后为啥返回false,是因为结束的时候一定是出错的时候吗？  并且最后若不断的有新连接进来，while不停，别的连接的请求也无法被处理， 他根本就没把连接加入users,就只管建立连接，其他都不管
     }
@@ -349,27 +361,27 @@ bool WebServer::dealclientdata() {
 
 void WebServer::dealwithread(int sockfd) {
 
-    util_timer *timer = users_timer[sockfd].timer;
+//    util_timer *timer = users_timer[sockfd].timer;
 
     if ( m_actormodel == 0) {      // Proactor   在主线程中读取数据
         if( users[sockfd].read_once() ) {
             LOG_INFO("deal with the client(%s)", inet_ntoa(users[sockfd].get_address()->sin_addr));
             // 检测到了读事件，并读取了数据
             m_pool->append(&users[sockfd], 0);
-            if(timer) {
-                adjust_timer(timer);
+            if(timeoutMS_ > 0) {
+                adjust_timer(sockfd);
             }
         }
         else {   // 对方断开连接或者出错，要把user中对应的对象销毁
 //            users->close_conn(true);  // 关闭连接， 如果有定时器的话，应该也可以不管，到时间也会清除，看他的项目里在这就没有，只是清除了定时器，好像不行啊
-            deal_timer(timer, sockfd);
+            deal_timer(sockfd);
         }
 
 
     }
     else {                      // Reactor 让子进程读写数据，在线程池的工作函数中需要加以判断
-        if(timer) {
-            adjust_timer(timer);
+        if(timeoutMS_ > 0) {
+            adjust_timer(sockfd);
         }
 
         m_pool->append(users+sockfd, 0);
@@ -377,7 +389,7 @@ void WebServer::dealwithread(int sockfd) {
         while(true) {   // 等待子线程处理完， improv其实算是一个信号（广义上的），告诉这边我处理完了，之后主线程才能工作，那这样对于主线程不就相当于阻塞的了
             if(users[sockfd].improv == 1) {
                 if(users[sockfd].timer_flag == 1) {
-                    deal_timer(timer, sockfd);
+                    deal_timer(sockfd);
                     users[sockfd].timer_flag = 0;
                 }
                 users[sockfd].improv = 0;
@@ -388,7 +400,7 @@ void WebServer::dealwithread(int sockfd) {
 
 }
 void WebServer::dealwithwrite(int sockfd) {
-    util_timer *timer = users_timer[sockfd].timer;
+//    util_timer *timer = users_timer[sockfd].timer;
 
     if(m_trigmode == 0) {
         // Proactor
@@ -396,19 +408,19 @@ void WebServer::dealwithwrite(int sockfd) {
 //            printf("--- 发送一次\n");
             LOG_INFO("send data to the client(%s)", inet_ntoa(users[sockfd].get_address()->sin_addr));
 
-            if(timer){
-                adjust_timer(timer);
+            if(timeoutMS_ > 0){
+                adjust_timer(sockfd);
             }
         }
         else{
 //            users[sockfd].close_conn();
-            deal_timer(timer, sockfd);
+            deal_timer(sockfd);
         }
     }
     else {
 
-        if(timer) {
-            adjust_timer(timer);
+        if(timeoutMS_ > 0) {
+            adjust_timer(sockfd);
         }
 
         m_pool->append(users+sockfd, 1);
@@ -416,7 +428,7 @@ void WebServer::dealwithwrite(int sockfd) {
         while(true) {
             if(users[sockfd].improv == 1) {
                 if(users[sockfd].timer_flag == 1) {
-                    deal_timer(timer, sockfd);
+                    deal_timer(sockfd);
                     users[sockfd].timer_flag = 0;
                 }
                 users[sockfd].improv = 0;
