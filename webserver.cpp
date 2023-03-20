@@ -298,7 +298,7 @@ void WebServer::timer(int connfd) {
 //    timer->expire = cur + 3 * TIMESLOT;
 //    users_timer[connfd].timer = timer;
 //    utils.m_timer_lst.add_timer(timer);
-    timer_->add(connfd, timeoutMS_,std::bind(&WebServer::close_conn, this, users+connfd));
+    timer_->add(connfd, timeoutMS_,std::bind(&WebServer::close_conn, this, users+connfd));  // 因为调用函数是Webserver的成员函数，且是普通的，其参数就必然会有一个隐含的this指针，现在要通过function来调用它，那么传入的参数也需要this
 //    cout<<"将"<<connfd<<" 加入到了定时器堆中"<<endl;
 }
 
