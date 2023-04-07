@@ -143,7 +143,7 @@ bool HeapTimer::siftdown_(size_t index, size_t n) {
     return i > index;
 }
 
-void HeapTimer::add(int id, int timeOut, const TimeoutCallBack &cb) {
+void HeapTimer::add(int id, int timeOut, const TimeoutCallBack &cb) {   // cb是将连接断开后，从epoll中除掉监控的结点，释放原来的连接信息
     assert(id >= 0);
     size_t i;
     if(ref_.count(id) == 0) {

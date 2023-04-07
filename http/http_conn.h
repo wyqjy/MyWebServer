@@ -28,6 +28,8 @@
 #include "../timer/lst_timer.h"
 #include "../CGImysql/sql_connection_pool.h"
 
+#include "../redis_study/redis_cache.h"
+
 class http_conn{
 public:
 
