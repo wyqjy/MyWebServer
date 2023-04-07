@@ -554,22 +554,22 @@ http_conn::HTTP_CODE http_conn::do_request() {
     if(S_ISDIR(m_file_stat.st_mode))
         return BAD_REQUEST;
 
-    cout<<"使用redis前:"<<m_real_file<<endl;
+//    cout<<"使用redis前:"<<m_real_file<<endl;
 
     // 进行redis缓存调用
     redis *r = redis::get_instance();
     char* res;
     if(r->Get_command(m_real_file, &res)) {   // 缓存中存在
-        cout<<"缓存命中"<<endl;
+//        cout<<"缓存命中"<<endl;
         m_file_address = res;
-        cout<<m_file_address<<endl;
+//        cout<<m_file_address<<endl;
         return FILE_REQUEST;
     }
 
     //以只读方式获取文件描述符，通过mmap将该文件映射到内存中
     int fd=open(m_real_file,O_RDONLY);
     m_file_address=(char*)mmap(0, m_file_stat.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
-    cout<<m_file_address<<endl;
+//    cout<<m_file_address<<endl;
     // 将信息存到redis
     r->Put_command(m_real_file, m_file_address);
 

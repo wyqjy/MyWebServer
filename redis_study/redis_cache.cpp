@@ -66,7 +66,7 @@ bool redis::Put_command(char *variable, char *val) {
     std::string r = reply->str;
     freeReplyObject(reply);
 
-//    redisCommand(connect, "expire %s %d", variable, 30);   // 设置生存时间
+    redisCommand(connect, "expire %s %d", variable, 30);   // 设置生存时间
 
     if(r=="OK")
         return true;
