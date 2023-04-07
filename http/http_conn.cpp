@@ -102,7 +102,7 @@ void http_conn::initmysql_result(connection_pool *connPool) {
 void http_conn::close_conn(bool real_close) {
 
     if(real_close && (m_sockfd != -1) ) {
-        printf("closed %d\n", m_sockfd);
+//        printf("closed %d\n", m_sockfd);
         utils.removefd(m_epollfd, m_sockfd);
         m_sockfd = -1;
         m_user_count--;

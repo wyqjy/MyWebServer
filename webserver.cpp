@@ -211,7 +211,7 @@ void WebServer::eventLoop() {
                 // util_timer  *timer = users_timer[sockfd].timer;
                 // deal_timer(timer, sockfd);           // 这里好像没将users[sockfd] 关闭啊， 就是调用users[sockfd].close_conn()    不用调用，在lst_timer的函数指针就做了，关闭sockfd
                 close_conn(&users[sockfd]);   //没有对小根堆的结点做删除处理，应该不用管
-                std::cout<<sockfd<<" 客户端关闭连接 "<<std::endl;
+//                std::cout<<sockfd<<" 客户端关闭连接 "<<std::endl;
             }
             // 信号处理     这个信号将会每个每隔TIMESLOT触发一次， 若没有更新expire时间，会断开三次之前的那个链接
             else if( sockfd == m_pipefd[0] && (events[i].events & EPOLLIN)) {
@@ -335,7 +335,7 @@ bool WebServer::dealclientdata() {
         timer(connfd);    // 定时器初始化添加一个结点， 定时器中不需要地址信息
 
         // 提示输出有一个客户端连接加入了进来
-        std::cout<<"有一个客户端连接加入了进来， 通信socketfd: "<<connfd<<std::endl;
+//        std::cout<<"有一个客户端连接加入了进来， 通信socketfd: "<<connfd<<std::endl;
 
     }
     else{   // 监听的边缘触发    没啥用的这个

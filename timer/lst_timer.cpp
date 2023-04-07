@@ -214,7 +214,7 @@ void HeapTimer::tick() {
         if(std::chrono::duration_cast<MS>(node.expires - Clock::now()).count() > 0) {   // 为什么要这么比较呢？用计数，直接判断相减的值不行吗
             break;
         }
-        cout<<node.id<<" 到时间终止了"<<endl;
+//        cout<<node.id<<" 到时间终止了"<<endl;
         node.cb();
         pop();
     }

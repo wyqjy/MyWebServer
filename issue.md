@@ -422,3 +422,33 @@ bug: 在将新来的连接加入到定时器堆的时候，发生了段错误
 bug: 获取存放的html信息，使用二级指针作为函数的形参，但返回的char*是乱码
 原因：之前得到的返回指针char*还是reply->str，但是随着freeReplyObject(reply); 它里面的内存就已经被释放掉了，所以得到的就是乱码。解决办法是，
   新建了一个char* tmp，把内容拷贝过去，用这个作为返回值. 但这样是否会影响效率呢
+
+测试一下，加不加redis效果没啥变化啊？
+还以为是因为在reply->str做了一次拷贝的原因，不做拷贝测试一下也还是这样
+是因为缓存的信息太少了吗？ 页面html的信息少，使得从磁盘读和从缓存读差距不大
+可能这个webbench只检测并发,不去管返回的结果（那服务器还是需要找到需要的资源的啊）
+
+    ---
+    30s  500client
+    使用
+    Speed=73586 pages/min, 137424 bytes/sec.
+    Requests: 36787 susceed, 6 failed.
+    
+    Speed=73020 pages/min, 136318 bytes/sec.
+    Requests: 36491 susceed, 19 failed.
+    
+    Speed=73226 pages/min, 136759 bytes/sec.
+    Requests: 36601 susceed, 12 failed.
+    
+    ---
+    不使用redis
+    Speed=74074 pages/min, 138316 bytes/sec.
+    Requests: 37025 susceed, 12 failed.
+    
+    Speed=72736 pages/min, 135833 bytes/sec.
+    Requests: 36361 susceed, 7 failed.
+    
+    Speed=72872 pages/min, 136046 bytes/sec.
+    Requests: 36415 susceed, 21 failed.
+
+会不会是因为没有连接池，所以只是单条redis连接的缘故

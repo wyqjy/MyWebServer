@@ -54,6 +54,7 @@ bool redis::Get_command(char *request, char **result) {
     tmp = (char *)malloc(strlen(reply1->str));
     strcpy(tmp, reply1->str);
     *result = tmp;
+//    *result = reply1->str;
 //    std::cout<<*result<<std::endl;
     freeReplyObject(reply1);      // 这个问题，释放后里面的内容就不存在了，所以返回值是乱码，如果不释放是不是会内存泄漏
     return true;
