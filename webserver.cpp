@@ -387,7 +387,7 @@ void WebServer::dealwithread(int sockfd) {
         m_pool->append(users+sockfd, 0);
 
         while(true) {   // 等待子线程处理完， improv其实算是一个信号（广义上的），告诉这边我处理完了，之后主线程才能工作，那这样对于主线程不就相当于阻塞的了
-            if(users[sockfd].improv == 1) {
+            if(users[sockfd].improv == 1) {     // 代表在子线程读完了数据，并处理完了请求
                 if(users[sockfd].timer_flag == 1) {
                     deal_timer(sockfd);
                     users[sockfd].timer_flag = 0;
@@ -402,7 +402,7 @@ void WebServer::dealwithread(int sockfd) {
 void WebServer::dealwithwrite(int sockfd) {
 //    util_timer *timer = users_timer[sockfd].timer;
 
-    if(m_trigmode == 0) {
+    if(m_actormodel == 0) {
         // Proactor
         if(users[sockfd].write()){
 //            printf("--- 发送一次\n");
@@ -418,7 +418,6 @@ void WebServer::dealwithwrite(int sockfd) {
         }
     }
     else {
-
         if(timeoutMS_ > 0) {
             adjust_timer(sockfd);
         }

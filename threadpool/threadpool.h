@@ -81,7 +81,7 @@ bool threadpool<T>::append(T *request, int state) {
         return false;
     }
 
-    request->m_state = state;
+    request->m_state = state;   // 在这里确定是读还是写
     m_workqueue.push_back(request);
     m_queuestat.post();
     m_queuelocker.unlock();
@@ -108,12 +108,13 @@ void threadpool<T>::run() {
         }
 
         T* request = m_workqueue.front();
+        cout<<request->m_state<<endl;
         m_workqueue.pop_front();
         m_queuelocker.unlock();
 
         if( m_actor_model == 1){     // Reactor
 
-            if(request->m_state == 0){
+            if(request->m_state == 0){   // state记录当前需要做的操作是读还是写
                 if(request->read_once()) {
                     request->improv = 1;
                     connectionRAII mysqlcon(&request->mysql, m_connPool);
@@ -124,7 +125,7 @@ void threadpool<T>::run() {
                     request->timer_flag = 1;
                 }
             }
-            else {
+            else {     // 状态的改变是在本类的append函数
                 if(request->write()) {
                     request->improv = 1;
                 }
