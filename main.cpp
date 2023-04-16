@@ -12,8 +12,8 @@ int main() {
 
     int port = 9999;
     int thread_num = 8;
-    int trigmode = 0;
-    int actor_model = 1;   // 模式  0是Proactor    1是Reactor
+    int trigmode = 0;       // 0LT+LT
+    int actor_model = 0;   // 模式  0是Proactor    1是Reactor
 
     int close_log = 1;  // 0开启日志 1关闭日志
     int log_write = 1;  // 同步日志

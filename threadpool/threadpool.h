@@ -108,7 +108,7 @@ void threadpool<T>::run() {
         }
 
         T* request = m_workqueue.front();
-        cout<<request->m_state<<endl;
+//        cout<<request->m_state<<endl;
         m_workqueue.pop_front();
         m_queuelocker.unlock();
 
